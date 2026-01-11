@@ -35,9 +35,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
-      return { error };
+      console.log('Tentative d\'inscription pour:', email);
+      console.log('URL Supabase:', import.meta.env.VITE_SUPABASE_URL?.substring(0, 30) + '...');
+      
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            email_verified: false
+          }
+        }
+      });
+      
+      console.log('Réponse signUp:', { 
+        hasError: !!error, 
+        errorMessage: error?.message,
+        hasUser: !!data?.user,
+        userEmail: data?.user?.email,
+        sessionExists: !!data?.session
+      });
+      
+      // Si pas d'erreur mais qu'on a besoin de confirmer l'email, on considère ça comme un succès
+      // Même si pas de session immédiate (confirmation email requise)
+      if (!error && data?.user) {
+        console.log('Inscription réussie (email peut nécessiter confirmation)');
+        return { error: null };
+      }
+      
+      if (error) {
+        console.error('Erreur Supabase:', {
+          message: error.message,
+          status: (error as any).status,
+          name: error.name,
+          fullError: error
+        });
+      }
+      
+      return { error: error as Error | null };
     } catch (error) {
+      console.error('Exception lors de l\'inscription:', error);
       return { error: error as Error };
     }
   };

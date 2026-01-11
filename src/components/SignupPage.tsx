@@ -32,13 +32,48 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
     }
 
     setLoading(true);
-    const { error } = await signUp(email, password);
+    try {
+      const { error } = await signUp(email, password);
 
-    if (error) {
-      setError('Cette adresse email est déjà utilisée ou invalide');
-      setLoading(false);
-    } else {
-      setSuccess(true);
+      if (error) {
+        console.error('Erreur d\'inscription complète:', error);
+        // Afficher le message d'erreur détaillé
+        const errorMessage = error.message || error.toString();
+        const errorStatus = (error as any).status;
+        
+        console.log('Détails de l\'erreur:', {
+          message: errorMessage,
+          status: errorStatus,
+          name: error.name,
+          stack: (error as any).stack
+        });
+        
+        if (errorStatus === 401 || errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+          setError(
+            'Erreur 401: Problème d\'authentification.\n' +
+            'Vérifiez:\n' +
+            '1. Que les variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY sont correctes dans .env\n' +
+            '2. Que vous avez redémarré le serveur après avoir modifié .env\n' +
+            '3. Que la confirmation email est désactivée dans Supabase (Auth → Settings) pour le développement\n' +
+            '4. Vérifiez la console du navigateur pour plus de détails'
+          );
+        } else if (errorMessage.includes('already registered') || errorMessage.includes('already exists') || errorMessage.includes('User already registered')) {
+          setError('Cette adresse email est déjà utilisée. Essayez de vous connecter.');
+        } else if (errorMessage.includes('Invalid') || errorMessage.includes('invalid')) {
+          setError('Adresse email ou mot de passe invalide');
+        } else if (errorMessage.includes('Email rate limit') || errorMessage.includes('too many')) {
+          setError('Trop de tentatives. Veuillez attendre quelques minutes.');
+        } else {
+          setError(`Erreur: ${errorMessage}${errorStatus ? ` (Status: ${errorStatus})` : ''}`);
+        }
+        setLoading(false);
+      } else {
+        setSuccess(true);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Exception lors de l\'inscription:', err);
+      setError('Une erreur inattendue s\'est produite. Vérifiez la console pour plus de détails.');
       setLoading(false);
     }
   };
