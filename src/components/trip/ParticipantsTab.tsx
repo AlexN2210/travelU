@@ -89,7 +89,7 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
         {isCreator && (
           <button
             onClick={() => setShowInvite(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
           >
             <Plus className="w-5 h-5" />
             <span>Inviter</span>
@@ -101,8 +101,8 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
         {participants.map((participant) => (
           <div key={participant.id} className="p-6 flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 bg-turquoise/20 rounded-full flex items-center justify-center">
+                <Users className="w-6 h-6 text-turquoise" />
               </div>
               <div>
                 <div className="flex items-center space-x-2">
@@ -139,8 +139,8 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
               {!isCreator && (
                 <span className={`px-3 py-1 text-sm font-medium rounded-full ${
                   participant.permission === 'edit'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-700'
+                    ? 'bg-palm-green/20 text-palm-green'
+                    : 'bg-cream text-dark-gray/70'
                 }`}>
                   {participant.permission === 'edit' ? 'Éditeur' : 'Lecteur'}
                 </span>

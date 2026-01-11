@@ -13,10 +13,10 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-cream flex items-center justify-center font-body">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement...</p>
+          <div className="w-16 h-16 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-dark-gray/70 font-body">Chargement...</p>
         </div>
       </div>
     );

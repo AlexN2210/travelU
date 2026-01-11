@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Calendar, AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import logo from '../public/logo.png';
 
 interface SignupPageProps {
   onSwitchToLogin: () => void;
@@ -79,32 +80,36 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-cream font-body flex items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <Calendar className="w-10 h-10 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">TravelU</h1>
+            <img 
+              src={logo} 
+              alt="TravelU Logo" 
+              className="w-10 h-10 object-contain"
+            />
+            <h1 className="text-3xl font-heading font-bold text-dark-gray">TravelU</h1>
           </div>
-          <h2 className="text-2xl font-semibold text-gray-900">Inscription</h2>
-          <p className="text-gray-600 mt-2">
+          <h2 className="text-2xl font-heading font-semibold text-dark-gray">Inscription</h2>
+          <p className="text-dark-gray/70 font-body mt-2">
             Créez votre compte pour commencer
           </p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="bg-white rounded-2xl shadow-medium p-8">
           {success ? (
             <div className="text-center py-6">
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              <CheckCircle className="w-16 h-16 text-palm-green mx-auto mb-4" />
+              <h3 className="text-xl font-heading font-semibold text-dark-gray mb-2">
                 Compte créé avec succès
               </h3>
-              <p className="text-gray-600 mb-6">
+              <p className="text-dark-gray/70 font-body mb-6">
                 Vous pouvez maintenant vous connecter
               </p>
               <button
                 onClick={onSwitchToLogin}
-                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-6 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
               >
                 Se connecter
               </button>
@@ -113,14 +118,14 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
             <>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center space-x-2 text-red-700">
+                  <div className="bg-burnt-orange/10 border border-burnt-orange/30 rounded-button p-3 flex items-center space-x-2 text-burnt-orange font-body">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    <span className="text-sm">{error}</span>
+                    <span className="text-sm whitespace-pre-line">{error}</span>
                   </div>
                 )}
 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-dark-gray mb-2 font-body">
                     Email
                   </label>
                   <input
@@ -129,13 +134,13 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent transition-colors font-body"
                     placeholder="votre@email.com"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-dark-gray mb-2 font-body">
                     Mot de passe
                   </label>
                   <input
@@ -144,13 +149,13 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent transition-colors font-body"
                     placeholder="••••••••"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-dark-gray mb-2 font-body">
                     Confirmer le mot de passe
                   </label>
                   <input
@@ -159,7 +164,7 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent transition-colors font-body"
                     placeholder="••••••••"
                   />
                 </div>
@@ -167,7 +172,7 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none tracking-wide"
                 >
                   {loading ? 'Création...' : 'Créer mon compte'}
                 </button>
@@ -176,14 +181,14 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
               <div className="mt-6 text-center space-y-3">
                 <button
                   onClick={onSwitchToLogin}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-turquoise hover:text-turquoise/80 font-body font-medium transition-colors"
                 >
                   Déjà un compte ? Se connecter
                 </button>
                 <div>
                   <button
                     onClick={onBack}
-                    className="text-gray-600 hover:text-gray-700"
+                    className="text-dark-gray/70 hover:text-dark-gray font-body transition-colors"
                   >
                     Retour à l'accueil
                   </button>

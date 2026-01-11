@@ -49,10 +49,10 @@ export function TripView({ tripId, onBack }: TripViewProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-cream flex items-center justify-center font-body">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement...</p>
+          <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-dark-gray/70 font-body">Chargement...</p>
         </div>
       </div>
     );
@@ -60,12 +60,12 @@ export function TripView({ tripId, onBack }: TripViewProps) {
 
   if (!trip) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-cream flex items-center justify-center font-body">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Voyage introuvable</p>
+          <p className="text-dark-gray/70 mb-4 font-body">Voyage introuvable</p>
           <button
             onClick={onBack}
-            className="text-blue-600 hover:text-blue-700 font-medium"
+            className="text-turquoise hover:text-turquoise/80 font-body font-medium transition-colors"
           >
             Retour au tableau de bord
           </button>
@@ -83,12 +83,12 @@ export function TripView({ tripId, onBack }: TripViewProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm">
+    <div className="min-h-screen bg-cream font-body">
+      <div className="bg-white shadow-soft">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <button
             onClick={onBack}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="flex items-center space-x-2 text-dark-gray/70 hover:text-dark-gray mb-4 font-body transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             <span>Retour</span>
@@ -97,22 +97,22 @@ export function TripView({ tripId, onBack }: TripViewProps) {
           <div className="mb-6">
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                <h1 className="text-3xl font-heading font-bold text-dark-gray mb-2">
                   {trip.name}
                 </h1>
                 {trip.description && (
-                  <p className="text-gray-600">{trip.description}</p>
+                  <p className="text-dark-gray/70 font-body">{trip.description}</p>
                 )}
               </div>
-              <span className={`px-4 py-2 text-sm font-semibold rounded-full ${
+              <span className={`px-4 py-2 text-sm font-heading font-semibold rounded-full ${
                 trip.type === 'roadtrip'
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-blue-100 text-blue-700'
+                  ? 'bg-palm-green/20 text-palm-green'
+                  : 'bg-turquoise/20 text-turquoise'
               }`}>
                 {trip.type === 'roadtrip' ? 'Road trip' : 'Destination unique'}
               </span>
             </div>
-            <div className="flex items-center space-x-4 text-sm text-gray-500 mt-4">
+            <div className="flex items-center space-x-4 text-sm text-dark-gray/60 mt-4 font-body">
               <span>
                 {new Date(trip.start_date).toLocaleDateString('fr-FR')} - {new Date(trip.end_date).toLocaleDateString('fr-FR')}
               </span>
@@ -124,10 +124,10 @@ export function TripView({ tripId, onBack }: TripViewProps) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as Tab)}
-                className={`flex items-center space-x-2 px-6 py-3 font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                className={`flex items-center space-x-2 px-6 py-3 font-body font-medium rounded-t-lg transition-colors whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'bg-gray-50 text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-cream text-turquoise border-b-2 border-turquoise'
+                    : 'text-dark-gray/70 hover:text-dark-gray'
                 }`}
               >
                 {tab.icon}

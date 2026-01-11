@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Calendar, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import logo from '../public/logo.png';
 
 interface LoginPageProps {
   onSwitchToSignup: () => void;
@@ -28,30 +29,34 @@ export function LoginPage({ onSwitchToSignup, onBack }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-cream font-body flex items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <Calendar className="w-10 h-10 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">TravelU</h1>
+            <img 
+              src={logo} 
+              alt="TravelU Logo" 
+              className="w-10 h-10 object-contain"
+            />
+            <h1 className="text-3xl font-heading font-bold text-dark-gray">TravelU</h1>
           </div>
-          <h2 className="text-2xl font-semibold text-gray-900">Connexion</h2>
-          <p className="text-gray-600 mt-2">
+          <h2 className="text-2xl font-heading font-semibold text-dark-gray">Connexion</h2>
+          <p className="text-dark-gray/70 font-body mt-2">
             Connectez-vous pour accéder à vos voyages
           </p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="bg-white rounded-2xl shadow-medium p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center space-x-2 text-red-700">
+              <div className="bg-burnt-orange/10 border border-burnt-orange/30 rounded-button p-3 flex items-center space-x-2 text-burnt-orange font-body">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 <span className="text-sm">{error}</span>
               </div>
             )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-dark-gray mb-2 font-body">
                 Email
               </label>
               <input
@@ -60,13 +65,13 @@ export function LoginPage({ onSwitchToSignup, onBack }: LoginPageProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent transition-colors font-body"
                 placeholder="votre@email.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-dark-gray mb-2 font-body">
                 Mot de passe
               </label>
               <input
@@ -75,7 +80,7 @@ export function LoginPage({ onSwitchToSignup, onBack }: LoginPageProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent transition-colors font-body"
                 placeholder="••••••••"
               />
             </div>
@@ -83,7 +88,7 @@ export function LoginPage({ onSwitchToSignup, onBack }: LoginPageProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none tracking-wide"
             >
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
@@ -92,14 +97,14 @@ export function LoginPage({ onSwitchToSignup, onBack }: LoginPageProps) {
           <div className="mt-6 text-center space-y-3">
             <button
               onClick={onSwitchToSignup}
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="text-turquoise hover:text-turquoise/80 font-body font-medium transition-colors"
             >
               Pas encore de compte ? S'inscrire
             </button>
             <div>
               <button
                 onClick={onBack}
-                className="text-gray-600 hover:text-gray-700"
+                className="text-dark-gray/70 hover:text-dark-gray font-body transition-colors"
               >
                 Retour à l'accueil
               </button>

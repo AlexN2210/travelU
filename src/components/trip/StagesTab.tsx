@@ -66,12 +66,12 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">
+        <h2 className="text-2xl font-bold text-dark-gray">
           {tripType === 'roadtrip' ? 'Étapes du road trip' : 'Destination'}
         </h2>
         <button
           onClick={() => setShowAddStage(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
         >
           <Plus className="w-5 h-5" />
           <span>Ajouter une étape</span>
@@ -80,11 +80,11 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
 
       {stages.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          <MapPin className="w-16 h-16 text-dark-gray/50 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-dark-gray mb-2">
             Aucune étape pour le moment
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-dark-gray/70 mb-6">
             Ajoutez votre première étape pour commencer à planifier
           </p>
           <button
@@ -101,14 +101,14 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
               <div key={stage.id} className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start space-x-3">
-                    <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                    <div className="w-8 h-8 bg-gradient-to-br from-gold to-turquoise text-white rounded-full flex items-center justify-center font-bold flex-shrink-0 shadow-soft">
                       {index + 1}
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-dark-gray">
                         {stage.name}
                       </h3>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-dark-gray/60">
                         {stage.latitude.toFixed(4)}, {stage.longitude.toFixed(4)}
                       </p>
                     </div>
@@ -123,12 +123,12 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
 
                 {stage.accommodation_link && (
                   <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-1">Hébergement:</p>
+                    <p className="text-sm text-dark-gray/70 mb-1">Hébergement:</p>
                     <a
                       href={stage.accommodation_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
+                      className="text-turquoise hover:text-turquoise/80 text-sm flex items-center space-x-1 font-body transition-colors"
                     >
                       <ExternalLink className="w-4 h-4" />
                       <span>Voir l'hébergement</span>
@@ -138,15 +138,15 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
 
                 {stage.transport_to_next && (
                   <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-1">Transport vers la prochaine étape:</p>
-                    <p className="text-sm text-gray-900">{stage.transport_to_next}</p>
+                    <p className="text-sm text-dark-gray/70 mb-1">Transport vers la prochaine étape:</p>
+                    <p className="text-sm text-dark-gray">{stage.transport_to_next}</p>
                   </div>
                 )}
 
                 {stage.notes && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Notes:</p>
-                    <p className="text-sm text-gray-900">{stage.notes}</p>
+                    <p className="text-sm text-dark-gray/70 mb-1">Notes:</p>
+                    <p className="text-sm text-dark-gray">{stage.notes}</p>
                   </div>
                 )}
               </div>
@@ -154,9 +154,9 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Carte</h3>
-            <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
-              <div className="text-center text-gray-500">
+            <h3 className="text-lg font-semibold text-dark-gray mb-4">Carte</h3>
+            <div className="bg-cream rounded-button h-96 flex items-center justify-center">
+              <div className="text-center text-dark-gray/60 font-body">
                 <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Carte interactive</p>
                 <p className="text-sm mt-1">
@@ -245,7 +245,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        <h2 className="text-2xl font-bold text-dark-gray mb-6">
           Ajouter une étape
         </h2>
 
@@ -257,7 +257,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
               Nom de l'étape *
             </label>
             <input
@@ -272,7 +272,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-dark-gray/80 mb-2">
                 Latitude *
               </label>
               <input
@@ -285,7 +285,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-dark-gray/80 mb-2">
                 Longitude *
               </label>
               <input
@@ -300,7 +300,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
               Lien hébergement (optionnel)
             </label>
             <input
@@ -313,7 +313,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
               Transport vers la prochaine étape (optionnel)
             </label>
             <input
@@ -326,7 +326,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
               Notes (optionnel)
             </label>
             <textarea
@@ -342,7 +342,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 text-gray-700 hover:text-gray-900 font-medium"
+              className="px-6 py-2 text-dark-gray/80 hover:text-dark-gray font-medium"
             >
               Annuler
             </button>

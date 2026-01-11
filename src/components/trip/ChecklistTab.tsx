@@ -187,14 +187,14 @@ export function ChecklistTab({ tripId }: ChecklistTabProps) {
         <div className="flex items-center space-x-3">
           <button
             onClick={handleGenerateSuggestions}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 bg-palm-green text-white font-body font-bold rounded-button hover:bg-palm-green/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
           >
             <Sparkles className="w-5 h-5" />
             <span>Suggestions</span>
           </button>
           <button
             onClick={() => setShowAddItem(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 bg-turquoise text-white font-body font-bold rounded-button hover:bg-turquoise/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
           >
             <Plus className="w-5 h-5" />
             <span>Ajouter</span>

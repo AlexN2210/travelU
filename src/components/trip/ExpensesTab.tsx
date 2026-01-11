@@ -127,7 +127,7 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
         <h2 className="text-2xl font-bold text-gray-900">Gestion des dépenses</h2>
         <button
           onClick={() => setShowAddExpense(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
         >
           <Plus className="w-5 h-5" />
           <span>Ajouter une dépense</span>
@@ -137,7 +137,7 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
       <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center space-x-3 mb-2">
-            <DollarSign className="w-8 h-8 text-blue-600" />
+            <DollarSign className="w-8 h-8 text-turquoise" />
             <div>
               <p className="text-sm text-gray-600">Total des dépenses</p>
               <p className="text-2xl font-bold text-gray-900">
@@ -214,7 +214,7 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
                     <h3 className="text-lg font-semibold text-gray-900">
                       {expense.description}
                     </h3>
-                    <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                    <span className="px-3 py-1 bg-turquoise/20 text-turquoise text-xs font-heading font-semibold rounded-full">
                       {expense.category}
                     </span>
                   </div>

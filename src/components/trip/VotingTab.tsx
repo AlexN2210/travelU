@@ -153,7 +153,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
         {selectedCategory && (
           <button
             onClick={() => setShowAddOption(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
           >
             <Plus className="w-5 h-5" />
             <span>Ajouter une option</span>

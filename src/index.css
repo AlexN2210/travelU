@@ -3,11 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  
   body {
     @apply font-body text-dark-gray;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 100vh;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading;
+  }
+  
+  #root {
+    min-height: 100vh;
   }
 }

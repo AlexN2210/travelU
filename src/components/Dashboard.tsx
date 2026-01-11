@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Plus, LogOut, MapPin } from 'lucide-react';
+import { Plus, LogOut, MapPin } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { TripView } from './TripView';
+import logo from '../public/logo.png';
 
 interface Trip {
   id: string;
@@ -60,19 +61,23 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div className="min-h-screen bg-cream font-body">
+      <nav className="bg-white shadow-soft">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <Calendar className="w-8 h-8 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900">TravelU</h1>
+            <div className="flex items-center space-x-3">
+              <img 
+                src={logo} 
+                alt="TravelU Logo" 
+                className="w-10 h-10 object-contain"
+              />
+              <h1 className="text-2xl font-heading font-bold text-dark-gray">TravelU</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600">{user?.email}</span>
+              <span className="text-dark-gray font-body">{user?.email}</span>
               <button
                 onClick={signOut}
-                className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+                className="flex items-center space-x-2 px-4 py-2.5 text-dark-gray hover:text-turquoise font-body font-medium transition-colors rounded-button"
               >
                 <LogOut className="w-5 h-5" />
                 <span>Déconnexion</span>
@@ -84,10 +89,10 @@ export function Dashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Mes voyages</h2>
+          <h2 className="text-3xl font-heading font-bold text-dark-gray">Mes voyages</h2>
           <button
             onClick={() => setShowCreateTrip(true)}
-            className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+            className="flex items-center space-x-2 px-6 py-3 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
           >
             <Plus className="w-5 h-5" />
             <span>Nouveau voyage</span>
@@ -96,21 +101,21 @@ export function Dashboard() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="mt-4 text-gray-600">Chargement...</p>
+            <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 text-dark-gray/70 font-body">Chargement...</p>
           </div>
         ) : trips.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl shadow-sm">
-            <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          <div className="text-center py-16 bg-white rounded-2xl shadow-soft">
+            <MapPin className="w-16 h-16 text-turquoise mx-auto mb-4" />
+            <h3 className="text-xl font-heading font-semibold text-dark-gray mb-2">
               Aucun voyage pour le moment
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-dark-gray/70 font-body mb-6">
               Créez votre premier voyage pour commencer l'aventure
             </p>
             <button
               onClick={() => setShowCreateTrip(true)}
-              className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-6 py-3 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
             >
               Créer un voyage
             </button>
@@ -121,27 +126,27 @@ export function Dashboard() {
               <div
                 key={trip.id}
                 onClick={() => setSelectedTripId(trip.id)}
-                className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow cursor-pointer p-6"
+                className="bg-white rounded-2xl shadow-soft hover:shadow-medium transition-all cursor-pointer p-6 transform hover:-translate-y-1"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-xl font-semibold text-gray-900">
+                  <h3 className="text-xl font-heading font-semibold text-dark-gray">
                     {trip.name}
                   </h3>
-                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                  <span className={`px-3 py-1 text-xs font-heading font-semibold rounded-full ${
                     trip.type === 'roadtrip'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-blue-100 text-blue-700'
+                      ? 'bg-palm-green/20 text-palm-green'
+                      : 'bg-turquoise/20 text-turquoise'
                   }`}>
                     {trip.type === 'roadtrip' ? 'Road trip' : 'Destination unique'}
                   </span>
                 </div>
                 {trip.description && (
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  <p className="text-dark-gray/70 font-body text-sm mb-4 line-clamp-2">
                     {trip.description}
                   </p>
                 )}
-                <div className="flex items-center text-sm text-gray-500">
-                  <Calendar className="w-4 h-4 mr-2" />
+                <div className="flex items-center text-sm text-dark-gray/60 font-body">
+                  <MapPin className="w-4 h-4 mr-2 text-turquoise" />
                   {formatDate(trip.start_date)} - {formatDate(trip.end_date)}
                 </div>
               </div>
@@ -221,21 +226,21 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-medium max-w-2xl w-full p-8">
+        <h2 className="text-2xl font-heading font-bold text-dark-gray mb-6">
           Créer un nouveau voyage
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+            <div className="bg-burnt-orange/10 border border-burnt-orange/30 rounded-lg p-3 text-burnt-orange text-sm font-body">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-dark-gray mb-2 font-body">
               Nom du voyage *
             </label>
             <input
@@ -243,27 +248,27 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent font-body"
               placeholder="Ex: Voyage en Italie"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-dark-gray mb-2 font-body">
               Description (optionnel)
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent font-body"
               placeholder="Décrivez votre voyage..."
             />
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-dark-gray mb-2 font-body">
                 Date de début *
               </label>
               <input
@@ -271,11 +276,11 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent font-body"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-dark-gray mb-2 font-body">
                 Date de fin *
               </label>
               <input
@@ -283,43 +288,43 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent font-body"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-dark-gray mb-3 font-body">
               Type de voyage *
             </label>
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => setType('single')}
-                className={`p-4 border-2 rounded-lg transition-colors ${
+                className={`p-4 border-2 rounded-button transition-all ${
                   type === 'single'
-                    ? 'border-blue-600 bg-blue-50'
-                    : 'border-gray-300 hover:border-gray-400'
+                    ? 'border-turquoise bg-turquoise/10 shadow-soft'
+                    : 'border-cream hover:border-turquoise/50'
                 }`}
               >
-                <MapPin className="w-6 h-6 mx-auto mb-2 text-blue-600" />
-                <div className="font-semibold">Destination unique</div>
-                <div className="text-sm text-gray-600 mt-1">
+                <MapPin className={`w-6 h-6 mx-auto mb-2 ${type === 'single' ? 'text-turquoise' : 'text-dark-gray/60'}`} />
+                <div className={`font-heading font-semibold ${type === 'single' ? 'text-turquoise' : 'text-dark-gray'}`}>Destination unique</div>
+                <div className="text-sm text-dark-gray/70 mt-1 font-body">
                   Une seule ville ou lieu
                 </div>
               </button>
               <button
                 type="button"
                 onClick={() => setType('roadtrip')}
-                className={`p-4 border-2 rounded-lg transition-colors ${
+                className={`p-4 border-2 rounded-button transition-all ${
                   type === 'roadtrip'
-                    ? 'border-blue-600 bg-blue-50'
-                    : 'border-gray-300 hover:border-gray-400'
+                    ? 'border-gold bg-gold/10 shadow-soft'
+                    : 'border-cream hover:border-gold/50'
                 }`}
               >
-                <Calendar className="w-6 h-6 mx-auto mb-2 text-blue-600" />
-                <div className="font-semibold">Road trip</div>
-                <div className="text-sm text-gray-600 mt-1">
+                <MapPin className={`w-6 h-6 mx-auto mb-2 ${type === 'roadtrip' ? 'text-gold' : 'text-dark-gray/60'}`} />
+                <div className={`font-heading font-semibold ${type === 'roadtrip' ? 'text-gold' : 'text-dark-gray'}`}>Road trip</div>
+                <div className="text-sm text-dark-gray/70 mt-1 font-body">
                   Plusieurs étapes
                 </div>
               </button>
@@ -330,14 +335,14 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 text-gray-700 hover:text-gray-900 font-medium"
+              className="px-6 py-2 text-dark-gray hover:text-turquoise font-body font-medium transition-colors rounded-button"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-6 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none tracking-wide"
             >
               {loading ? 'Création...' : 'Créer le voyage'}
             </button>
