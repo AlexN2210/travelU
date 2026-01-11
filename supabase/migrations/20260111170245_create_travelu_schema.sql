@@ -463,9 +463,33 @@ CREATE POLICY "Participants can delete checklist items"
     )
   );
 
+-- Indexes pour améliorer les performances
 CREATE INDEX IF NOT EXISTS idx_trip_participants_user ON trip_participants(user_id);
 CREATE INDEX IF NOT EXISTS idx_trip_participants_trip ON trip_participants(trip_id);
 CREATE INDEX IF NOT EXISTS idx_stages_trip ON stages(trip_id);
+CREATE INDEX IF NOT EXISTS idx_stages_order ON stages(trip_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_vote_categories_trip ON vote_categories(trip_id);
+CREATE INDEX IF NOT EXISTS idx_vote_options_category ON vote_options(category_id);
+CREATE INDEX IF NOT EXISTS idx_user_votes_option ON user_votes(option_id);
+CREATE INDEX IF NOT EXISTS idx_user_votes_user ON user_votes(user_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_trip ON expenses(trip_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_paid_by ON expenses(paid_by);
 CREATE INDEX IF NOT EXISTS idx_checklist_items_trip ON checklist_items(trip_id);
+CREATE INDEX IF NOT EXISTS idx_checklist_items_category ON checklist_items(trip_id, category);
+CREATE INDEX IF NOT EXISTS idx_trips_creator ON trips(creator_id);
+CREATE INDEX IF NOT EXISTS idx_trips_dates ON trips(start_date, end_date);
+
+-- Fonction pour mettre à jour automatiquement updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger pour mettre à jour updated_at sur trips
+CREATE TRIGGER update_trips_updated_at
+  BEFORE UPDATE ON trips
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
