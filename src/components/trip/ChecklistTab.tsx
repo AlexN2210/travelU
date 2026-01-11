@@ -349,9 +349,24 @@ function AddItemModal({ tripId, onClose, onSuccess }: AddItemModalProps) {
     onSuccess();
   };
 
+  // Bloque le scroll du body quand la modale est ouverte
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-8">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
           Ajouter un élément
         </h2>
