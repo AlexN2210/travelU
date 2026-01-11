@@ -3,6 +3,7 @@ import { Plus, LogOut, MapPin } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { TripView } from './TripView';
+import { CityAutocomplete } from './CityAutocomplete';
 import logo from '../public/logo.png';
 
 interface Trip {
@@ -176,6 +177,8 @@ interface CreateTripModalProps {
 function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
   const { user } = useAuth();
   const [name, setName] = useState('');
+  const [destination, setDestination] = useState('');
+  const [selectedDestination, setSelectedDestination] = useState<{ name: string; lat: number; lon: number } | null>(null);
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -186,6 +189,11 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!selectedDestination && type === 'single') {
+      setError('Veuillez sélectionner une destination');
+      return;
+    }
 
     if (new Date(endDate) < new Date(startDate)) {
       setError('La date de fin doit être après la date de début');
@@ -253,6 +261,30 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
               {error}
             </div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-dark-gray mb-2 font-body">
+              Destination *
+            </label>
+            <CityAutocomplete
+              value={destination}
+              onChange={setDestination}
+              onSelect={(city) => {
+                setSelectedDestination(city);
+                // Auto-remplir le nom du voyage si vide
+                if (!name) {
+                  setName(`Voyage à ${city.name}`);
+                }
+              }}
+              placeholder="Rechercher une ville ou un pays..."
+              required
+            />
+            {selectedDestination && (
+              <p className="mt-1 text-xs text-dark-gray/60 font-body">
+                📍 {selectedDestination.name} ({selectedDestination.lat.toFixed(4)}, {selectedDestination.lon.toFixed(4)})
+              </p>
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-dark-gray mb-2 font-body">
