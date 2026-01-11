@@ -190,10 +190,8 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
     e.preventDefault();
     setError('');
 
-    if (!selectedDestination && type === 'single') {
-      setError('Veuillez sélectionner une destination');
-      return;
-    }
+    // Note: La destination n'est pas obligatoire, elle sert juste à pré-remplir le nom
+    // Pour les voyages "single", l'utilisateur peut ajouter l'étape manuellement après
 
     if (new Date(endDate) < new Date(startDate)) {
       setError('La date de fin doit être après la date de début');
@@ -202,31 +200,104 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
 
     setLoading(true);
 
+    // Vérifications préalables
+    if (!user?.id) {
+      setError('Erreur : utilisateur non connecté');
+      setLoading(false);
+      return;
+    }
+
+    if (!name.trim()) {
+      setError('Le nom du voyage est requis');
+      setLoading(false);
+      return;
+    }
+
+    if (!startDate || !endDate) {
+      setError('Les dates sont requises');
+      setLoading(false);
+      return;
+    }
+
+    console.log('Création du voyage avec les données:', {
+      name,
+      description: description || null,
+      start_date: startDate,
+      end_date: endDate,
+      type,
+      creator_id: user.id
+    });
+
     const { data, error: insertError } = await supabase
       .from('trips')
       .insert({
-        name,
-        description: description || null,
+        name: name.trim(),
+        description: description.trim() || null,
         start_date: startDate,
         end_date: endDate,
         type,
-        creator_id: user!.id
+        creator_id: user.id
       })
       .select()
       .single();
 
     if (insertError) {
-      setError('Erreur lors de la création du voyage');
+      console.error('Erreur complète lors de la création du voyage:', {
+        message: insertError.message,
+        code: insertError.code,
+        details: insertError.details,
+        hint: insertError.hint,
+        error: insertError
+      });
+      
+      let errorMessage = 'Erreur lors de la création du voyage';
+      
+      if (insertError.code === 'PGRST301' || insertError.message?.includes('permission denied')) {
+        errorMessage = 'Erreur de permissions. Vérifiez que les politiques RLS sont correctement configurées dans Supabase.';
+      } else if (insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
+        errorMessage = 'La table "trips" n\'existe pas. Veuillez appliquer la migration SQL dans Supabase (SQL Editor).';
+      } else if (insertError.message) {
+        errorMessage = `Erreur: ${insertError.message}`;
+        if (insertError.hint) {
+          errorMessage += ` (${insertError.hint})`;
+        }
+      } else if (insertError.code) {
+        errorMessage = `Erreur ${insertError.code}`;
+      }
+      
+      setError(errorMessage);
       setLoading(false);
       return;
     }
 
     if (data) {
-      await supabase.from('trip_participants').insert({
+      // Ajouter le créateur comme participant avec permission d'édition
+      const { error: participantError } = await supabase.from('trip_participants').insert({
         trip_id: data.id,
-        user_id: user!.id,
+        user_id: user.id,
         permission: 'edit'
       });
+
+      if (participantError) {
+        console.error('Erreur lors de l\'ajout du participant:', participantError);
+        // On continue quand même car le voyage a été créé
+      }
+
+      // Si une destination a été sélectionnée et que c'est un voyage "single", créer automatiquement l'étape
+      if (selectedDestination && type === 'single' && data.id) {
+        const { error: stageError } = await supabase.from('stages').insert({
+          trip_id: data.id,
+          name: selectedDestination.name,
+          order_index: 1,
+          latitude: selectedDestination.lat,
+          longitude: selectedDestination.lon
+        });
+
+        if (stageError) {
+          console.error('Erreur lors de la création de l\'étape:', stageError);
+          // On continue quand même, l'utilisateur pourra ajouter l'étape manuellement
+        }
+      }
     }
 
     setLoading(false);
