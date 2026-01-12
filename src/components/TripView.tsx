@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Users, Vote, DollarSign, CheckSquare, Settings } from 'lucide-react';
+import { ArrowLeft, MapPin, Users, Vote, DollarSign, CheckSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { StagesTab } from './trip/StagesTab';
 import { ParticipantsTab } from './trip/ParticipantsTab';

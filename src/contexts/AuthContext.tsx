@@ -36,7 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string) => {
     try {
       console.log('Tentative d\'inscription pour:', email);
-      console.log('URL Supabase:', import.meta.env.VITE_SUPABASE_URL?.substring(0, 30) + '...');
+      if (import.meta.env.DEV) {
+        console.log('URL Supabase:', import.meta.env.VITE_SUPABASE_URL?.substring(0, 30) + '...');
+      }
       
       const { data, error } = await supabase.auth.signUp({ 
         email, 

@@ -54,12 +54,15 @@ export function VotingTab({ tripId }: VotingTabProps) {
       .eq('trip_id', tripId)
       .order('created_at', { ascending: true });
 
-    if (!error && data) {
+    if (!error && data && Array.isArray(data)) {
       setCategories(data);
       if (data.length > 0 && !selectedCategory) {
         setSelectedCategory(data[0].id);
+      } else if (data.length === 0) {
+        await createDefaultCategories();
+        loadCategories();
       }
-    } else if (!error && data?.length === 0) {
+    } else if (!error && (!data || (Array.isArray(data) && data.length === 0))) {
       await createDefaultCategories();
       loadCategories();
     }
@@ -195,7 +198,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {options.map((option) => {
-            const totalVotes = option.upvotes + option.downvotes;
+            // const totalVotes = option.upvotes + option.downvotes; // Non utilisé pour l'instant
             const score = option.upvotes - option.downvotes;
 
             return (

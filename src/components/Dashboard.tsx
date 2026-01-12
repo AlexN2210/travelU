@@ -229,7 +229,7 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
     });
 
     // Insérer le voyage - on récupérera l'ID après avoir ajouté le participant
-    const { data: insertData, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from('trips')
       .insert({
         name: name.trim(),
@@ -322,11 +322,6 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
           // On continue quand même, l'utilisateur pourra ajouter l'étape manuellement
         }
       }
-    } else {
-      setError('Le voyage a été créé mais l\'ID n\'a pas pu être récupéré');
-      setLoading(false);
-      return;
-    }
 
     setLoading(false);
     onSuccess();

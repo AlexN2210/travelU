@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, MapPin, Trash2, GripVertical, ExternalLink } from 'lucide-react';
+import { Plus, MapPin, Trash2, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Stage {
