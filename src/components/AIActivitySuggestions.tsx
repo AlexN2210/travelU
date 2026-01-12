@@ -76,9 +76,11 @@ export function AIActivitySuggestions({ cityName, latitude, longitude, onAddActi
           if (name && !seenNames.has(name)) {
             seenNames.add(name);
             
-            // Créer un lien vers OpenStreetMap ou Google Maps
-            const osmUrl = `https://www.openstreetmap.org/node/${element.id}`;
-            const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}+${encodeURIComponent(fullCityName)}`;
+            // Créer un lien vers Google Maps avec la clé API
+            const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+            const googleMapsUrl = googleMapsApiKey 
+              ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}+${encodeURIComponent(fullCityName)}&key=${googleMapsApiKey}`
+              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}+${encodeURIComponent(fullCityName)}`;
             
             // Déterminer le type d'activité
             let activityType = 'Lieu d\'intérêt';

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, MapPin, Trash2, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { CityAutocomplete } from '../CityAutocomplete';
-import { StagesMap } from '../StagesMap';
+import { StagesMapGoogle } from '../StagesMapGoogle';
 import { AIActivitySuggestions } from '../AIActivitySuggestions';
 
 interface PointOfInterest {
@@ -201,7 +201,7 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
           <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-6">
             <h3 className="text-lg font-semibold text-dark-gray mb-4">Carte</h3>
             {stages.length > 0 ? (
-              <StagesMap stages={stages} />
+              <StagesMapGoogle stages={stages} />
             ) : (
               <div className="bg-cream rounded-button h-96 flex items-center justify-center">
                 <div className="text-center text-dark-gray/60 font-body">

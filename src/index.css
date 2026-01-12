@@ -83,13 +83,8 @@
     -webkit-overflow-scrolling: touch;
   }
   
-  /* Styles pour Leaflet */
-  .leaflet-container {
+  /* Styles pour Google Maps */
+  .gm-style {
     font-family: 'Inter', 'Roboto', sans-serif;
-  }
-  
-  .custom-marker {
-    background: transparent;
-    border: none;
   }
 }

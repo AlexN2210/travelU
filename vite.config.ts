@@ -6,6 +6,6 @@ export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
     exclude: ['lucide-react'],
-    include: ['leaflet', 'react-leaflet'],
+    include: ['@react-google-maps/api'],
   },
 });
