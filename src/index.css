@@ -82,4 +82,14 @@
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
   }
+  
+  /* Styles pour Leaflet */
+  .leaflet-container {
+    font-family: 'Inter', 'Roboto', sans-serif;
+  }
+  
+  .custom-marker {
+    background: transparent;
+    border: none;
+  }
 }
