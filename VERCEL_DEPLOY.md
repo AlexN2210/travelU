@@ -8,8 +8,11 @@ Dans votre projet Vercel, allez dans **Settings** → **Environment Variables** 
 
 - `VITE_SUPABASE_URL` : L'URL de votre projet Supabase
 - `VITE_SUPABASE_ANON_KEY` : La clé anon de votre projet Supabase
+- `VITE_GOOGLE_MAPS_API_KEY` : Votre clé Google Maps API
 
-**Important** : Ces variables doivent être ajoutées pour tous les environnements (Production, Preview, Development).
+**Important** : 
+- Ces variables doivent être ajoutées pour tous les environnements (Production, Preview, Development)
+- ⚠️ **Sécurité Google Maps** : Assurez-vous d'avoir restreint votre clé API dans Google Cloud Console avec votre domaine Vercel (`*.vercel.app`)
 
 ### 2. Configuration du build
 
