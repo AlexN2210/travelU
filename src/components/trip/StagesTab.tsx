@@ -260,7 +260,6 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
   const [showTransportRoute, setShowTransportRoute] = useState(false);
   const [transportRouteDestination, setTransportRouteDestination] = useState<{ name: string; lat: number; lng: number; originLat?: number; originLng?: number; useGeolocation?: boolean } | null>(null);
   const [showAddressInput, setShowAddressInput] = useState(false);
-  const [transportRouteDestination, setTransportRouteDestination] = useState<{ name: string; lat: number; lng: number } | null>(null);
 
   const handleDestinationSelect = (city: { name: string; lat: number; lon: number; display_name: string }) => {
     console.log('Destination sélectionnée:', city);
