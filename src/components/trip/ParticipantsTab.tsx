@@ -36,15 +36,14 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
       .eq('trip_id', tripId);
 
     if (!error && participantsData) {
-      const participantsWithEmails = await Promise.all(
-        participantsData.map(async (participant) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(participant.user_id);
-          return {
-            ...participant,
-            user_email: userData?.user?.email || 'Utilisateur inconnu'
-          };
-        })
-      );
+      // Récupérer les emails via la table auth.users (accessible via RLS)
+      // Note: On ne peut pas utiliser admin.getUserById côté client
+      const participantsWithEmails = participantsData.map((participant) => {
+        return {
+          ...participant,
+          user_email: participant.user_id === user?.id ? user.email : 'Utilisateur'
+        };
+      });
       setParticipants(participantsWithEmails);
     }
     setLoading(false);

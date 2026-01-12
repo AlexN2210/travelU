@@ -239,6 +239,7 @@ interface AddStageModalProps {
 function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModalProps) {
   const [name, setName] = useState('');
   const [selectedDestination, setSelectedDestination] = useState<{ name: string; lat: number; lon: number } | null>(null);
+  console.log('AddStageModal - selectedDestination:', selectedDestination);
   const [accommodationLink, setAccommodationLink] = useState('');
   const [transportToNext, setTransportToNext] = useState('');
   const [notes, setNotes] = useState('');
@@ -360,8 +361,8 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
             )}
           </div>
 
-          {selectedDestination ? (
-            <div className="mt-2">
+          {selectedDestination && (
+            <div className="mt-4 p-4 bg-cream/30 rounded-lg border border-gold/20">
               <AIActivitySuggestions
                 cityName={name || selectedDestination.name}
                 latitude={selectedDestination.lat}
@@ -371,7 +372,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
                 }}
               />
             </div>
-          ) : null}
+          )}
 
           <div>
             <label className="block text-sm font-medium text-dark-gray/80 mb-2">

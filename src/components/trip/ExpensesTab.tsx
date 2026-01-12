@@ -45,15 +45,12 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
       .order('created_at', { ascending: false });
 
     if (!error && expensesData) {
-      const expensesWithEmails = await Promise.all(
-        expensesData.map(async (expense) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(expense.paid_by);
-          return {
-            ...expense,
-            payer_email: userData?.user?.email || 'Utilisateur inconnu'
-          };
-        })
-      );
+      const expensesWithEmails = expensesData.map((expense) => {
+        return {
+          ...expense,
+          payer_email: expense.paid_by === user?.id ? user.email : 'Utilisateur'
+        };
+      });
       setExpenses(expensesWithEmails);
       calculateBalances(expensesWithEmails);
     }
@@ -82,16 +79,13 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
       });
     }
 
-    const balancesWithEmails = await Promise.all(
-      Array.from(balanceMap.entries()).map(async ([userId, balance]) => {
-        const { data: userData } = await supabase.auth.admin.getUserById(userId);
-        return {
-          userId,
-          userEmail: userData?.user?.email || 'Utilisateur inconnu',
-          balance
-        };
-      })
-    );
+    const balancesWithEmails = Array.from(balanceMap.entries()).map(([userId, balance]) => {
+      return {
+        userId,
+        userEmail: userId === user?.id ? user.email : 'Utilisateur',
+        balance
+      };
+    });
 
     setBalances(balancesWithEmails);
   };
@@ -286,15 +280,12 @@ function AddExpenseModal({ tripId, onClose, onSuccess }: AddExpenseModalProps) {
       .eq('trip_id', tripId);
 
     if (participantsData) {
-      const participantsWithEmails = await Promise.all(
-        participantsData.map(async (p) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(p.user_id);
-          return {
-            id: p.user_id,
-            email: userData?.user?.email || 'Utilisateur inconnu'
-          };
-        })
-      );
+      const participantsWithEmails = participantsData.map((p) => {
+        return {
+          id: p.user_id,
+          email: p.user_id === user?.id ? user.email : 'Utilisateur'
+        };
+      });
       setParticipants(participantsWithEmails);
       setSelectedParticipants(participantsWithEmails.map(p => p.id));
     }
