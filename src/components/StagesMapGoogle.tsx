@@ -27,7 +27,9 @@ const containerStyle = {
   height: '100%'
 };
 
-const libraries: ("places" | "drawing" | "geometry" | "localContext" | "visualization")[] = [];
+import { GOOGLE_MAPS_LIBRARIES } from '../lib/googleMapsConfig';
+
+const libraries = GOOGLE_MAPS_LIBRARIES;
 
 export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
   const [isMounted, setIsMounted] = useState(false);

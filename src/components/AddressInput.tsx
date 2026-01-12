@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
 import { useLoadScript } from '@react-google-maps/api';
+import { GOOGLE_MAPS_LIBRARIES } from '../lib/googleMapsConfig';
 
 interface AddressInputProps {
   onSelect: (address: { address: string; lat: number; lng: number }) => void;
@@ -21,7 +22,7 @@ export function AddressInput({ onSelect, onCancel, placeholder = "Entrez votre a
 
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: apiKey || '',
-    libraries: ['places']
+    libraries: GOOGLE_MAPS_LIBRARIES
   });
 
   // Initialiser les services Google Places

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPinned, Loader2, ExternalLink } from 'lucide-react';
 import { useLoadScript } from '@react-google-maps/api';
+import { GOOGLE_MAPS_LIBRARIES } from '../lib/googleMapsConfig';
 
 interface PointOfInterest {
   place_id: string;
@@ -42,7 +43,7 @@ export function PointOfInterestAutocomplete({
 
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: apiKey || '',
-    libraries: ['places']
+    libraries: GOOGLE_MAPS_LIBRARIES
   });
 
   // Initialiser les services Google Places
@@ -82,22 +83,47 @@ export function PointOfInterestAutocomplete({
 
     setIsLoading(true);
 
-    const request: google.maps.places.AutocompletionRequest = {
+    // Faire deux requêtes séparées car "establishment" ne peut pas être mélangé avec d'autres types
+    const baseRequest = {
       input: searchQuery,
-      types: ['establishment', 'point_of_interest'],
-      language: 'fr'
+      language: 'fr' as const
     };
 
     // Ajouter un biais de localisation si disponible
+    let locationBias: google.maps.Circle | undefined;
     if (latitude && longitude) {
-      request.location = new google.maps.LatLng(latitude, longitude);
-      request.radius = 10000;
+      const location = new google.maps.LatLng(latitude, longitude);
+      locationBias = new google.maps.Circle({
+        center: location,
+        radius: 10000
+      });
     }
 
-    autocompleteServiceRef.current.getPlacePredictions(request, (predictions, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+    const request1: google.maps.places.AutocompletionRequest = {
+      ...baseRequest,
+      types: ['point_of_interest'],
+      ...(locationBias && { locationBias })
+    };
+    
+    const request2: google.maps.places.AutocompletionRequest = {
+      ...baseRequest,
+      types: ['establishment'],
+      ...(locationBias && { locationBias })
+    };
+
+    // Faire deux requêtes et combiner les résultats
+    const allPredictions: google.maps.places.AutocompletePrediction[] = [];
+    let completedRequests = 0;
+    
+    const processResults = () => {
+      // Combiner et dédupliquer les prédictions
+      const uniquePredictions = Array.from(
+        new Map(allPredictions.map(p => [p.place_id, p])).values()
+      ).slice(0, 8);
+      
+      if (uniquePredictions.length > 0) {
         // Récupérer les détails pour chaque prédiction
-        const detailsPromises = predictions.slice(0, 8).map((prediction) => {
+        const detailsPromises = uniquePredictions.map((prediction) => {
           return new Promise<PointOfInterest | null>((resolve) => {
             if (!placesServiceRef.current) {
               resolve(null);
@@ -140,7 +166,25 @@ export function PointOfInterestAutocomplete({
         setSuggestions([]);
         setIsLoading(false);
       }
-    });
+    };
+    
+    const handlePredictions = (predictions: google.maps.places.AutocompletePrediction[] | null, status: google.maps.places.PlacesServiceStatus) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+        allPredictions.push(...predictions);
+      }
+      completedRequests++;
+      
+      // Quand les deux requêtes sont terminées, traiter les résultats
+      if (completedRequests === 2) {
+        processResults();
+      }
+    };
+
+    // Requête 1: point_of_interest
+    autocompleteServiceRef.current.getPlacePredictions(request1, handlePredictions);
+    
+    // Requête 2: establishment
+    autocompleteServiceRef.current.getPlacePredictions(request2, handlePredictions);
   };
 
   // Debounce pour éviter trop de requêtes
