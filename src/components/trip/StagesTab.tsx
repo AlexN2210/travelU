@@ -93,14 +93,43 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
         <h2 className="text-2xl font-bold text-dark-gray">
           {tripType === 'roadtrip' ? 'Étapes du road trip' : 'Destination'}
         </h2>
-        <button
-          onClick={() => setShowAddStage(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
-        >
-          <Plus className="w-5 h-5" />
-          <span>{tripType === 'roadtrip' ? 'Ajouter une étape' : 'Ajouter/modifier la destination'}</span>
-        </button>
+        {tripType === 'roadtrip' && (
+          <button
+            onClick={() => setShowAddStage(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Ajouter une étape</span>
+          </button>
+        )}
       </div>
+
+      {/* Boutons pour single trip */}
+      {tripType === 'single' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <button
+            onClick={() => setShowAddStage(true)}
+            className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-turquoise rounded-button hover:bg-turquoise/10 transition-all shadow-soft hover:shadow-medium"
+          >
+            <MapPinned className="w-5 h-5 text-turquoise" />
+            <span className="font-body font-semibold text-dark-gray">Points d'intérêt</span>
+          </button>
+          <button
+            onClick={() => setShowAddStage(true)}
+            className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-gold rounded-button hover:bg-gold/10 transition-all shadow-soft hover:shadow-medium"
+          >
+            <Car className="w-5 h-5 text-gold" />
+            <span className="font-body font-semibold text-dark-gray">Transport</span>
+          </button>
+          <button
+            onClick={() => setShowAddStage(true)}
+            className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-palm-green rounded-button hover:bg-palm-green/10 transition-all shadow-soft hover:shadow-medium"
+          >
+            <Hotel className="w-5 h-5 text-palm-green" />
+            <span className="font-body font-semibold text-dark-gray">Hébergement</span>
+          </button>
+        </div>
+      )}
 
       {stages.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
@@ -365,7 +394,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
           </div>
 
           {selectedDestination && (
-            <div className="mt-4 p-4 bg-cream/30 rounded-lg border border-gold/20">
+            <div className="mt-4">
               <AIActivitySuggestions
                 cityName={name || selectedDestination.name}
                 latitude={selectedDestination.lat}
@@ -374,6 +403,14 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
                   setPointsOfInterest([...pointsOfInterest, activity]);
                 }}
               />
+            </div>
+          )}
+          
+          {!selectedDestination && (
+            <div className="mt-4 p-3 bg-cream/50 rounded-lg border border-turquoise/30 text-center">
+              <p className="text-sm text-dark-gray/70 font-body">
+                Sélectionnez une destination pour voir les suggestions d'activités par IA
+              </p>
             </div>
           )}
 
