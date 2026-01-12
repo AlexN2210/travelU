@@ -249,6 +249,7 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
   const [error, setError] = useState('');
 
   const handleDestinationSelect = (city: { name: string; lat: number; lon: number; display_name: string }) => {
+    console.log('Destination sélectionnée:', city);
     setSelectedDestination({ name: city.name, lat: city.lat, lon: city.lon });
     setName(city.name);
   };
@@ -359,16 +360,18 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
             )}
           </div>
 
-          {selectedDestination && (
-            <AIActivitySuggestions
-              cityName={name || selectedDestination.name}
-              latitude={selectedDestination.lat}
-              longitude={selectedDestination.lon}
-              onAddActivity={(activity) => {
-                setPointsOfInterest([...pointsOfInterest, activity]);
-              }}
-            />
-          )}
+          {selectedDestination ? (
+            <div className="mt-2">
+              <AIActivitySuggestions
+                cityName={name || selectedDestination.name}
+                latitude={selectedDestination.lat}
+                longitude={selectedDestination.lon}
+                onAddActivity={(activity) => {
+                  setPointsOfInterest([...pointsOfInterest, activity]);
+                }}
+              />
+            </div>
+          ) : null}
 
           <div>
             <label className="block text-sm font-medium text-dark-gray/80 mb-2">

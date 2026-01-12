@@ -136,7 +136,7 @@ export function AIActivitySuggestions({ cityName, latitude, longitude, onAddActi
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 mt-4">
       <button
         type="button"
         onClick={fetchAISuggestions}
