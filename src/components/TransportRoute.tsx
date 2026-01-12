@@ -5,6 +5,9 @@ interface TransportRouteProps {
   destinationLat: number;
   destinationLng: number;
   destinationName: string;
+  originLat?: number;
+  originLng?: number;
+  useGeolocation?: boolean;
   onClose: () => void;
 }
 
@@ -16,7 +19,7 @@ interface RouteOption {
   url: string;
 }
 
-export function TransportRoute({ destinationLat, destinationLng, destinationName, onClose }: TransportRouteProps) {
+export function TransportRoute({ destinationLat, destinationLng, destinationName, originLat, originLng, useGeolocation = true, onClose }: TransportRouteProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,8 +29,15 @@ export function TransportRoute({ destinationLat, destinationLng, destinationName
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   useEffect(() => {
-    getCurrentLocation();
-  }, []);
+    if (useGeolocation) {
+      getCurrentLocation();
+    } else if (originLat && originLng) {
+      calculateRoutes(originLat, originLng);
+    } else {
+      setError('Coordonnées de départ manquantes');
+      setLoading(false);
+    }
+  }, [useGeolocation, originLat, originLng]);
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
