@@ -35,7 +35,12 @@ export function Dashboard() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error('Erreur lors du chargement des voyages:', error);
+      // Ne pas bloquer l'interface, juste logger l'erreur
+    }
+    
+    if (data) {
       setTrips(data);
     }
     setLoading(false);
@@ -334,8 +339,14 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
         });
 
         if (stageError) {
-          console.error('Erreur lors de la création de l\'étape:', stageError);
+          console.error('Erreur lors de la création de l\'étape:', {
+            message: stageError.message,
+            code: stageError.code,
+            details: stageError.details,
+            hint: stageError.hint
+          });
           // On continue quand même, l'utilisateur pourra ajouter l'étape manuellement
+          // Ne pas bloquer le succès de la création du voyage
         }
       }
 
