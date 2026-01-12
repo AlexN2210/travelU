@@ -221,7 +221,9 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
       {showAddStage && (
         <AddStageModal
           tripId={tripId}
+          tripType={tripType}
           orderIndex={stages.length}
+          existingStage={tripType === 'single' && stages.length > 0 ? stages[0] : null}
           onClose={() => setShowAddStage(false)}
           onSuccess={() => {
             setShowAddStage(false);
@@ -235,18 +237,26 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
 
 interface AddStageModalProps {
   tripId: string;
+  tripType: 'single' | 'roadtrip';
   orderIndex: number;
+  existingStage?: Stage | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModalProps) {
-  const [name, setName] = useState('');
-  const [selectedDestination, setSelectedDestination] = useState<{ name: string; lat: number; lon: number } | null>(null);
+function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, onSuccess }: AddStageModalProps) {
+  const [name, setName] = useState(existingStage?.name || '');
+  const [selectedDestination, setSelectedDestination] = useState<{ name: string; lat: number; lon: number } | null>(
+    existingStage ? {
+      name: existingStage.name,
+      lat: existingStage.latitude,
+      lon: existingStage.longitude
+    } : null
+  );
   console.log('AddStageModal - selectedDestination:', selectedDestination);
-  const [accommodationLink, setAccommodationLink] = useState('');
-  const [transportToNext, setTransportToNext] = useState('');
-  const [notes, setNotes] = useState('');
+  const [accommodationLink, setAccommodationLink] = useState(existingStage?.accommodation_link || '');
+  const [transportToNext, setTransportToNext] = useState(existingStage?.transport_to_next || '');
+  const [notes, setNotes] = useState(existingStage?.notes || '');
   const [pointsOfInterest, setPointsOfInterest] = useState<PointOfInterest[]>([]);
   const [newPoiTitle, setNewPoiTitle] = useState('');
   const [newPoiUrl, setNewPoiUrl] = useState('');
@@ -289,7 +299,8 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
     e.preventDefault();
     setError('');
 
-    if (!selectedDestination) {
+    // Pour les voyages "single" avec étape existante, la destination est déjà définie
+    if (!selectedDestination && !(tripType === 'single' && existingStage)) {
       setError('Veuillez sélectionner une destination');
       return;
     }
@@ -301,25 +312,55 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
 
     setLoading(true);
 
-    const { error: insertError } = await supabase
-      .from('stages')
-      .insert({
-        trip_id: tripId,
-        name: name.trim(),
-        order_index: orderIndex,
-        latitude: selectedDestination.lat,
-        longitude: selectedDestination.lon,
-        accommodation_link: accommodationLink || null,
-        transport_to_next: transportToNext || null,
-        notes: notes || null,
-        points_of_interest: pointsOfInterest.length > 0 ? pointsOfInterest : null
-      });
+    // Si une étape existe déjà, on la met à jour au lieu d'en créer une nouvelle
+    if (existingStage) {
+      const { error: updateError } = await supabase
+        .from('stages')
+        .update({
+          name: name.trim(),
+          latitude: selectedDestination?.lat || existingStage.latitude,
+          longitude: selectedDestination?.lon || existingStage.longitude,
+          accommodation_link: accommodationLink || null,
+          transport_to_next: transportToNext || null,
+          notes: notes || null,
+          points_of_interest: pointsOfInterest.length > 0 ? pointsOfInterest : null
+        })
+        .eq('id', existingStage.id);
 
-    if (insertError) {
-      console.error('Erreur lors de l\'ajout de l\'étape:', insertError);
-      setError(`Erreur lors de l'ajout de l'étape: ${insertError.message || 'Erreur inconnue'}`);
-      setLoading(false);
-      return;
+      if (updateError) {
+        console.error('Erreur lors de la mise à jour de l\'étape:', updateError);
+        setError(`Erreur lors de la mise à jour de l'étape: ${updateError.message || 'Erreur inconnue'}`);
+        setLoading(false);
+        return;
+      }
+    } else {
+      // Créer une nouvelle étape
+      if (!selectedDestination) {
+        setError('Veuillez sélectionner une destination');
+        setLoading(false);
+        return;
+      }
+
+      const { error: insertError } = await supabase
+        .from('stages')
+        .insert({
+          trip_id: tripId,
+          name: name.trim(),
+          order_index: orderIndex,
+          latitude: selectedDestination.lat,
+          longitude: selectedDestination.lon,
+          accommodation_link: accommodationLink || null,
+          transport_to_next: transportToNext || null,
+          notes: notes || null,
+          points_of_interest: pointsOfInterest.length > 0 ? pointsOfInterest : null
+        });
+
+      if (insertError) {
+        console.error('Erreur lors de l\'ajout de l\'étape:', insertError);
+        setError(`Erreur lors de l'ajout de l'étape: ${insertError.message || 'Erreur inconnue'}`);
+        setLoading(false);
+        return;
+      }
     }
 
     setLoading(false);
@@ -355,23 +396,39 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
-              Destination *
-            </label>
-            <CityAutocomplete
-              value={name}
-              onChange={(value) => setName(value)}
-              onSelect={handleDestinationSelect}
-              placeholder="Rechercher une ville ou un pays..."
-              className="w-full"
-            />
-            {selectedDestination && (
-              <p className="mt-2 text-sm text-dark-gray/60 font-body">
+          {/* Champ de destination - masqué pour les voyages "single" avec étape existante */}
+          {!(tripType === 'single' && existingStage) && (
+            <div>
+              <label className="block text-sm font-medium text-dark-gray/80 mb-2">
+                Destination *
+              </label>
+              <CityAutocomplete
+                value={name}
+                onChange={(value) => setName(value)}
+                onSelect={handleDestinationSelect}
+                placeholder="Rechercher une ville ou un pays..."
+                className="w-full"
+              />
+              {selectedDestination && (
+                <p className="mt-2 text-sm text-dark-gray/60 font-body">
+                  Coordonnées: {selectedDestination.lat.toFixed(4)}, {selectedDestination.lon.toFixed(4)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Affichage de la destination pour les voyages "single" avec étape existante */}
+          {tripType === 'single' && existingStage && selectedDestination && (
+            <div className="bg-cream rounded-lg p-4">
+              <label className="block text-sm font-medium text-dark-gray/80 mb-2">
+                Destination
+              </label>
+              <p className="font-semibold text-dark-gray">{selectedDestination.name}</p>
+              <p className="mt-1 text-sm text-dark-gray/60 font-body">
                 Coordonnées: {selectedDestination.lat.toFixed(4)}, {selectedDestination.lon.toFixed(4)}
               </p>
-            )}
-          </div>
+            </div>
+          )}
 
           {selectedDestination && (
             <div className="mt-4">
