@@ -466,33 +466,6 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
             </div>
           )}
 
-          {/* Boutons pour les autres sections */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-
-            {/* Bouton Transport */}
-            <button
-              type="button"
-              onClick={() => setShowTransportModal(true)}
-              className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-gold rounded-button hover:bg-gold/10 transition-all shadow-soft hover:shadow-medium"
-            >
-              <Car className="w-5 h-5 text-gold" />
-              <span className="font-body font-semibold text-dark-gray">
-                Transport {transportToNext && '✓'}
-              </span>
-            </button>
-
-            {/* Bouton Hébergement */}
-            <button
-              type="button"
-              onClick={() => setShowAccommodationModal(true)}
-              className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-palm-green rounded-button hover:bg-palm-green/10 transition-all shadow-soft hover:shadow-medium"
-            >
-              <Hotel className="w-5 h-5 text-palm-green" />
-              <span className="font-body font-semibold text-dark-gray">
-                Hébergement {accommodationLink && '✓'}
-              </span>
-            </button>
-          </div>
 
           <div>
             <label className="block text-sm font-medium text-dark-gray/80 mb-2">
