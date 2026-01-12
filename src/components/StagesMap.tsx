@@ -78,32 +78,30 @@ export function StagesMap({ stages }: StagesMapProps) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {validStages.map((stage, index) => {
-          // Créer l'icône avec useMemo pour éviter les problèmes de rendu
-          const icon = useMemo(() => {
-            const iconHtml = `
-              <div style="
-                background: linear-gradient(135deg, #FFC857 0%, #00B4D8 100%);
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                border: 3px solid white;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-weight: bold;
-                font-size: 14px;
-              ">${index + 1}</div>
-            `;
-            
-            return L.divIcon({
-              className: 'custom-marker',
-              html: iconHtml,
-              iconSize: [32, 32],
-              iconAnchor: [16, 16],
-            });
-          }, [index]);
+          // Créer l'icône directement (sans useMemo dans le callback)
+          const iconHtml = `
+            <div style="
+              background: linear-gradient(135deg, #FFC857 0%, #00B4D8 100%);
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              border: 3px solid white;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-weight: bold;
+              font-size: 14px;
+            ">${index + 1}</div>
+          `;
+          
+          const icon = L.divIcon({
+            className: 'custom-marker',
+            html: iconHtml,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+          });
 
           return (
             <Marker
