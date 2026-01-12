@@ -228,8 +228,10 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       creator_id: user.id
     });
 
-    // Insérer le voyage - on récupérera l'ID après avoir ajouté le participant
-    const { error: insertError } = await supabase
+    // Insérer le voyage et récupérer l'ID directement
+    // La politique SELECT permet au créateur de voir son propre voyage (creator_id = auth.uid())
+    // donc cela ne devrait pas causer de récursion
+    const { data: insertData, error: insertError } = await supabase
       .from('trips')
       .insert({
         name: name.trim(),
@@ -238,7 +240,9 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
         end_date: endDate,
         type,
         creator_id: user.id
-      });
+      })
+      .select('id')
+      .single();
 
     if (insertError) {
       console.error('Erreur complète lors de la création du voyage:', {
@@ -271,27 +275,14 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       return;
     }
 
-    // Récupérer l'ID du voyage créé en faisant une requête séparée
-    // On cherche le dernier voyage créé par cet utilisateur
-    const { data: newTrip, error: fetchError } = await supabase
-      .from('trips')
-      .select('id')
-      .eq('creator_id', user.id)
-      .eq('name', name.trim())
-      .eq('start_date', startDate)
-      .eq('end_date', endDate)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (fetchError || !newTrip) {
-      console.error('Erreur lors de la récupération du voyage créé:', fetchError);
-      setError('Le voyage a été créé mais n\'a pas pu être récupéré. Rafraîchissez la page.');
+    if (!insertData?.id) {
+      console.error('Aucun ID retourné après la création du voyage');
+      setError('Le voyage a été créé mais l\'ID n\'a pas pu être récupéré. Rafraîchissez la page.');
       setLoading(false);
       return;
     }
 
-    const tripId = newTrip.id;
+    const tripId = insertData.id;
 
       // Ajouter le créateur comme participant avec permission d'édition
       const { error: participantError } = await supabase.from('trip_participants').insert({
