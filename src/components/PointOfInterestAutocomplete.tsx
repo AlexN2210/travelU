@@ -64,33 +64,71 @@ export function PointOfInterestAutocomplete({
 
     setIsLoading(true);
     try {
-      // Utiliser Google Places Autocomplete API
+      // Essayer d'abord avec Autocomplete API
       const locationBias = latitude && longitude 
         ? `&location=${latitude},${longitude}&radius=10000`
         : '';
       
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchQuery)}&key=${apiKey}&types=establishment|point_of_interest${locationBias}&language=fr`
-      );
-      
-      const data = await response.json();
-      
-      if (data.predictions) {
-        // Récupérer les détails pour chaque prédiction
-        const detailsPromises = data.predictions.slice(0, 8).map(async (prediction: any) => {
-          const detailsResponse = await fetch(
-            `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&key=${apiKey}&fields=name,formatted_address,geometry,types&language=fr`
-          );
-          const detailsData = await detailsResponse.json();
-          return detailsData.result;
-        });
-
-        const details = await Promise.all(detailsPromises);
-        setSuggestions(details.filter((d: any) => d !== undefined));
-        setSelectedIndex(-1);
-      } else {
-        setSuggestions([]);
+      let autocompleteResponse;
+      try {
+        autocompleteResponse = await fetch(
+          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchQuery)}&key=${apiKey}&types=establishment|point_of_interest${locationBias}&language=fr`
+        );
+      } catch (err) {
+        console.warn('Erreur Autocomplete, utilisation de Text Search:', err);
+        autocompleteResponse = null;
       }
+      
+      let suggestions: PointOfInterest[] = [];
+      
+      if (autocompleteResponse) {
+        const autocompleteData = await autocompleteResponse.json();
+        
+        if (autocompleteData.predictions && autocompleteData.predictions.length > 0) {
+          // Récupérer les détails pour chaque prédiction
+          const detailsPromises = autocompleteData.predictions.slice(0, 8).map(async (prediction: any) => {
+            try {
+              const detailsResponse = await fetch(
+                `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&key=${apiKey}&fields=name,formatted_address,geometry,types&language=fr`
+              );
+              const detailsData = await detailsResponse.json();
+              return detailsData.result;
+            } catch (err) {
+              console.warn('Erreur lors de la récupération des détails:', err);
+              return null;
+            }
+          });
+
+          const details = await Promise.all(detailsPromises);
+          suggestions = details.filter((d: any) => d !== undefined && d !== null) as PointOfInterest[];
+        }
+      }
+      
+      // Si Autocomplete ne donne pas de résultats, utiliser Text Search
+      if (suggestions.length === 0) {
+        const textSearchQuery = latitude && longitude
+          ? `${searchQuery} near ${latitude},${longitude}`
+          : searchQuery;
+        
+        const textSearchResponse = await fetch(
+          `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(textSearchQuery)}&key=${apiKey}&language=fr${latitude && longitude ? `&location=${latitude},${longitude}&radius=10000` : ''}`
+        );
+        
+        const textSearchData = await textSearchResponse.json();
+        
+        if (textSearchData.results && textSearchData.results.length > 0) {
+          suggestions = textSearchData.results.slice(0, 8).map((result: any) => ({
+            place_id: result.place_id,
+            name: result.name,
+            formatted_address: result.formatted_address || result.vicinity || '',
+            geometry: result.geometry,
+            types: result.types
+          }));
+        }
+      }
+      
+      setSuggestions(suggestions);
+      setSelectedIndex(-1);
     } catch (error) {
       console.error('Erreur lors de la recherche de points d\'intérêt:', error);
       setSuggestions([]);
