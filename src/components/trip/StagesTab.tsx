@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, MapPin, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, MapPin, Trash2, ExternalLink, Hotel, Car, MapPinned } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { CityAutocomplete } from '../CityAutocomplete';
 import { StagesMapGoogle } from '../StagesMapGoogle';
@@ -248,6 +248,9 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
   const [newPoiUrl, setNewPoiUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPoiModal, setShowPoiModal] = useState(false);
+  const [showTransportModal, setShowTransportModal] = useState(false);
+  const [showAccommodationModal, setShowAccommodationModal] = useState(false);
 
   const handleDestinationSelect = (city: { name: string; lat: number; lon: number; display_name: string }) => {
     console.log('Destination sélectionnée:', city);
@@ -374,98 +377,43 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
-              Lien hébergement (optionnel)
-            </label>
-            <input
-              type="url"
-              value={accommodationLink}
-              onChange={(e) => setAccommodationLink(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="https://airbnb.com/..."
-            />
-          </div>
+          {/* Boutons pour les sections optionnelles */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            {/* Bouton Points d'intérêt */}
+            <button
+              type="button"
+              onClick={() => setShowPoiModal(true)}
+              className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-turquoise rounded-button hover:bg-turquoise/10 transition-all shadow-soft hover:shadow-medium"
+            >
+              <MapPinned className="w-5 h-5 text-turquoise" />
+              <span className="font-body font-semibold text-dark-gray">
+                Points d'intérêt {pointsOfInterest.length > 0 && `(${pointsOfInterest.length})`}
+              </span>
+            </button>
 
-          <div>
-            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
-              Transport vers la prochaine étape (optionnel)
-            </label>
-            <input
-              type="text"
-              value={transportToNext}
-              onChange={(e) => setTransportToNext(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Ex: Train, Voiture, Avion..."
-            />
-          </div>
+            {/* Bouton Transport */}
+            <button
+              type="button"
+              onClick={() => setShowTransportModal(true)}
+              className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-gold rounded-button hover:bg-gold/10 transition-all shadow-soft hover:shadow-medium"
+            >
+              <Car className="w-5 h-5 text-gold" />
+              <span className="font-body font-semibold text-dark-gray">
+                Transport {transportToNext && '✓'}
+              </span>
+            </button>
 
-          <div>
-            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
-              Points d'intérêt (musées, jardins, etc.) (optionnel)
-            </label>
-            <div className="space-y-2 mb-2">
-              {pointsOfInterest.map((poi, index) => (
-                <div key={index} className="flex items-center justify-between bg-cream rounded-lg p-2">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-dark-gray">{poi.title}</p>
-                    <a
-                      href={poi.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-turquoise hover:text-turquoise/80 flex items-center space-x-1"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span className="text-xs truncate max-w-xs">{poi.url}</span>
-                    </a>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemovePoi(index)}
-                    className="text-burnt-orange hover:text-burnt-orange/80 p-1 ml-2"
-                    title="Supprimer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                value={newPoiTitle}
-                onChange={(e) => setNewPoiTitle(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Ex: Musée du Louvre"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddPoi();
-                  }
-                }}
-              />
-              <input
-                type="url"
-                value={newPoiUrl}
-                onChange={(e) => setNewPoiUrl(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="https://..."
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddPoi();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleAddPoi}
-                className="px-4 py-2 bg-gold text-white font-semibold rounded-lg hover:bg-gold/90 transition-colors flex items-center space-x-1"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Ajouter</span>
-              </button>
-            </div>
+            {/* Bouton Hébergement */}
+            <button
+              type="button"
+              onClick={() => setShowAccommodationModal(true)}
+              className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-palm-green rounded-button hover:bg-palm-green/10 transition-all shadow-soft hover:shadow-medium"
+            >
+              <Hotel className="w-5 h-5 text-palm-green" />
+              <span className="font-body font-semibold text-dark-gray">
+                Hébergement {accommodationLink && '✓'}
+              </span>
+            </button>
           </div>
 
           <div>
@@ -499,6 +447,149 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
           </div>
         </form>
       </div>
+
+      {/* Modal Points d'intérêt */}
+      {showPoiModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm" onClick={() => setShowPoiModal(false)}>
+          <div className="bg-white rounded-2xl shadow-medium max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto smooth-scroll modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-dark-gray">Points d'intérêt</h3>
+              <button onClick={() => setShowPoiModal(false)} className="text-dark-gray/60 hover:text-dark-gray">✕</button>
+            </div>
+            <div className="space-y-4">
+              {pointsOfInterest.length > 0 && (
+                <div className="space-y-2">
+                  {pointsOfInterest.map((poi, index) => (
+                    <div key={index} className="flex items-center justify-between bg-cream rounded-lg p-3">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-dark-gray">{poi.title}</p>
+                        <a
+                          href={poi.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-turquoise hover:text-turquoise/80 flex items-center space-x-1 mt-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span className="text-xs truncate max-w-xs">{poi.url}</span>
+                        </a>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePoi(index)}
+                        className="text-burnt-orange hover:text-burnt-orange/80 p-1 ml-2"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newPoiTitle}
+                  onChange={(e) => setNewPoiTitle(e.target.value)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-turquoise focus:border-transparent"
+                  placeholder="Ex: Musée du Louvre"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddPoi();
+                    }
+                  }}
+                />
+                <input
+                  type="url"
+                  value={newPoiUrl}
+                  onChange={(e) => setNewPoiUrl(e.target.value)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-turquoise focus:border-transparent"
+                  placeholder="https://..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddPoi();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddPoi}
+                  className="px-4 py-2 bg-turquoise text-white rounded-button hover:bg-turquoise/90 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowPoiModal(false)}
+                  className="px-4 py-2 bg-dark-gray text-white rounded-button hover:bg-dark-gray/90 transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Transport */}
+      {showTransportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm" onClick={() => setShowTransportModal(false)}>
+          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-dark-gray">Transport vers la prochaine étape</h3>
+              <button onClick={() => setShowTransportModal(false)} className="text-dark-gray/60 hover:text-dark-gray">✕</button>
+            </div>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={transportToNext}
+                onChange={(e) => setTransportToNext(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-transparent"
+                placeholder="Ex: Train, Voiture, Avion..."
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowTransportModal(false)}
+                  className="px-4 py-2 bg-dark-gray text-white rounded-button hover:bg-dark-gray/90 transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Hébergement */}
+      {showAccommodationModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm" onClick={() => setShowAccommodationModal(false)}>
+          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-dark-gray">Lien hébergement</h3>
+              <button onClick={() => setShowAccommodationModal(false)} className="text-dark-gray/60 hover:text-dark-gray">✕</button>
+            </div>
+            <div className="space-y-4">
+              <input
+                type="url"
+                value={accommodationLink}
+                onChange={(e) => setAccommodationLink(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-palm-green focus:border-transparent"
+                placeholder="https://airbnb.com/..."
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowAccommodationModal(false)}
+                  className="px-4 py-2 bg-dark-gray text-white rounded-button hover:bg-dark-gray/90 transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
