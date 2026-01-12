@@ -228,75 +228,100 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       creator_id: user.id
     });
 
-    // Insérer le voyage et récupérer l'ID directement
-    // La politique SELECT permet au créateur de voir son propre voyage (creator_id = auth.uid())
-    // donc cela ne devrait pas causer de récursion
-    const { data: insertData, error: insertError } = await supabase
-      .from('trips')
-      .insert({
-        name: name.trim(),
-        description: description.trim() || null,
-        start_date: startDate,
-        end_date: endDate,
-        type,
-        creator_id: user.id
-      })
-      .select('id')
-      .single();
+    // Utiliser la fonction PostgreSQL pour créer le voyage et éviter la récursion RLS
+    // Si la fonction n'existe pas, on utilisera la méthode classique
+    const { data: functionResult, error: functionError } = await supabase.rpc('create_trip_and_return_id', {
+      p_name: name.trim(),
+      p_description: description.trim() || null,
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_type: type,
+      p_creator_id: user.id
+    });
 
-    if (insertError) {
-      console.error('Erreur complète lors de la création du voyage:', {
-        message: insertError.message,
-        code: insertError.code,
-        details: insertError.details,
-        hint: insertError.hint,
-        error: insertError
-      });
-      
-      let errorMessage = 'Erreur lors de la création du voyage';
-      
-      if (insertError.code === '42P17' || insertError.message?.includes('infinite recursion')) {
-        errorMessage = 'Erreur de récursion dans les politiques RLS. Veuillez exécuter le script de correction dans Supabase SQL Editor (fichier: 20260112000000_fix_rls_recursion.sql)';
-      } else if (insertError.code === 'PGRST301' || insertError.message?.includes('permission denied')) {
-        errorMessage = 'Erreur de permissions. Vérifiez que les politiques RLS sont correctement configurées dans Supabase.';
-      } else if (insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
-        errorMessage = 'La table "trips" n\'existe pas. Veuillez appliquer la migration SQL dans Supabase (SQL Editor).';
-      } else if (insertError.message) {
-        errorMessage = `Erreur: ${insertError.message}`;
-        if (insertError.hint) {
-          errorMessage += ` (${insertError.hint})`;
+    let tripId: string | null = null;
+
+    if (functionError) {
+      // Si la fonction n'existe pas, utiliser la méthode classique
+      if (functionError.message?.includes('function') || functionError.message?.includes('does not exist')) {
+        console.log('Fonction PostgreSQL non disponible, utilisation de la méthode classique');
+        
+        // Méthode alternative : insérer sans select, puis récupérer via une requête simple
+        const { error: insertError } = await supabase
+          .from('trips')
+          .insert({
+            name: name.trim(),
+            description: description.trim() || null,
+            start_date: startDate,
+            end_date: endDate,
+            type,
+            creator_id: user.id
+          });
+
+        if (insertError) {
+          console.error('Erreur lors de la création du voyage:', insertError);
+          let errorMessage = 'Erreur lors de la création du voyage';
+          
+          if (insertError.code === '42P17' || insertError.message?.includes('infinite recursion')) {
+            errorMessage = 'Erreur de récursion RLS. Veuillez exécuter les scripts de correction dans Supabase SQL Editor.';
+          } else if (insertError.message) {
+            errorMessage = `Erreur: ${insertError.message}`;
+          }
+          
+          setError(errorMessage);
+          setLoading(false);
+          return;
         }
-      } else if (insertError.code) {
-        errorMessage = `Erreur ${insertError.code}`;
-      }
-      
-      setError(errorMessage);
-      setLoading(false);
-      return;
-    }
 
-    if (!insertData?.id) {
-      console.error('Aucun ID retourné après la création du voyage');
-      setError('Le voyage a été créé mais l\'ID n\'a pas pu être récupéré. Rafraîchissez la page.');
-      setLoading(false);
-      return;
-    }
+        // Attendre un peu pour que l'insertion soit complète
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-    const tripId = insertData.id;
+        // Récupérer l'ID avec une requête simple qui ne devrait pas causer de récursion
+        const { data: newTrip, error: fetchError } = await supabase
+          .from('trips')
+          .select('id')
+          .eq('creator_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
 
-      // Ajouter le créateur comme participant avec permission d'édition
-      const { error: participantError } = await supabase.from('trip_participants').insert({
-        trip_id: tripId,
-        user_id: user.id,
-        permission: 'edit'
-      });
+        if (fetchError || !newTrip?.id) {
+          console.error('Erreur lors de la récupération du voyage:', fetchError);
+          setError('Le voyage a été créé mais n\'a pas pu être récupéré. Veuillez rafraîchir la page.');
+          setLoading(false);
+          return;
+        }
 
-      if (participantError) {
-        console.error('Erreur lors de l\'ajout du participant:', participantError);
-        setError('Le voyage a été créé mais l\'ajout en tant que participant a échoué');
+        tripId = newTrip.id;
+
+        // Ajouter le créateur comme participant
+        const { error: participantError } = await supabase.from('trip_participants').insert({
+          trip_id: tripId,
+          user_id: user.id,
+          permission: 'edit'
+        });
+
+        if (participantError) {
+          console.error('Erreur lors de l\'ajout du participant:', participantError);
+          setError('Le voyage a été créé mais l\'ajout en tant que participant a échoué');
+          setLoading(false);
+          return;
+        }
+      } else {
+        setError(`Erreur: ${functionError.message}`);
         setLoading(false);
         return;
       }
+    } else {
+      // La fonction a fonctionné
+      tripId = functionResult;
+    }
+
+    if (!tripId) {
+      setError('Impossible de récupérer l\'ID du voyage créé');
+      setLoading(false);
+      return;
+    }
 
       // Si une destination a été sélectionnée et que c'est un voyage "single", créer automatiquement l'étape
       if (selectedDestination && type === 'single') {
