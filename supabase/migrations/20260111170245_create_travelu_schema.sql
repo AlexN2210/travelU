@@ -173,13 +173,16 @@ ALTER TABLE user_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checklist_items ENABLE ROW LEVEL SECURITY;
 
+-- Utiliser EXISTS au lieu de IN pour éviter les problèmes de récursion
 CREATE POLICY "Users can view trips they created or participate in"
   ON trips FOR SELECT
   TO authenticated
   USING (
     creator_id = auth.uid() OR
-    id IN (
-      SELECT trip_id FROM trip_participants WHERE user_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM trip_participants 
+      WHERE trip_participants.trip_id = trips.id 
+        AND trip_participants.user_id = auth.uid()
     )
   );
 
@@ -193,16 +196,20 @@ CREATE POLICY "Trip creators and editors can update trips"
   TO authenticated
   USING (
     creator_id = auth.uid() OR
-    id IN (
-      SELECT trip_id FROM trip_participants 
-      WHERE user_id = auth.uid() AND permission = 'edit'
+    EXISTS (
+      SELECT 1 FROM trip_participants 
+      WHERE trip_participants.trip_id = trips.id 
+        AND trip_participants.user_id = auth.uid() 
+        AND trip_participants.permission = 'edit'
     )
   )
   WITH CHECK (
     creator_id = auth.uid() OR
-    id IN (
-      SELECT trip_id FROM trip_participants 
-      WHERE user_id = auth.uid() AND permission = 'edit'
+    EXISTS (
+      SELECT 1 FROM trip_participants 
+      WHERE trip_participants.trip_id = trips.id 
+        AND trip_participants.user_id = auth.uid() 
+        AND trip_participants.permission = 'edit'
     )
   );
 
@@ -215,11 +222,15 @@ CREATE POLICY "Participants can view trip participants"
   ON trip_participants FOR SELECT
   TO authenticated
   USING (
-    trip_id IN (
-      SELECT id FROM trips WHERE creator_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM trips 
+      WHERE trips.id = trip_participants.trip_id 
+        AND trips.creator_id = auth.uid()
     ) OR
-    trip_id IN (
-      SELECT trip_id FROM trip_participants WHERE user_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM trip_participants tp2
+      WHERE tp2.trip_id = trip_participants.trip_id 
+        AND tp2.user_id = auth.uid()
     )
   );
 

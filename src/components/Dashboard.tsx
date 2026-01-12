@@ -228,7 +228,8 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       creator_id: user.id
     });
 
-    const { data, error: insertError } = await supabase
+    // Insérer le voyage sans select pour éviter la récursion RLS
+    const { data: insertData, error: insertError } = await supabase
       .from('trips')
       .insert({
         name: name.trim(),
@@ -238,7 +239,7 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
         type,
         creator_id: user.id
       })
-      .select()
+      .select('id')
       .single();
 
     if (insertError) {
@@ -252,7 +253,9 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       
       let errorMessage = 'Erreur lors de la création du voyage';
       
-      if (insertError.code === 'PGRST301' || insertError.message?.includes('permission denied')) {
+      if (insertError.code === '42P17' || insertError.message?.includes('infinite recursion')) {
+        errorMessage = 'Erreur de récursion dans les politiques RLS. Vérifiez la configuration Supabase.';
+      } else if (insertError.code === 'PGRST301' || insertError.message?.includes('permission denied')) {
         errorMessage = 'Erreur de permissions. Vérifiez que les politiques RLS sont correctement configurées dans Supabase.';
       } else if (insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
         errorMessage = 'La table "trips" n\'existe pas. Veuillez appliquer la migration SQL dans Supabase (SQL Editor).';
@@ -270,23 +273,27 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       return;
     }
 
-    if (data) {
+    if (insertData?.id) {
+      const tripId = insertData.id;
+
       // Ajouter le créateur comme participant avec permission d'édition
       const { error: participantError } = await supabase.from('trip_participants').insert({
-        trip_id: data.id,
+        trip_id: tripId,
         user_id: user.id,
         permission: 'edit'
       });
 
       if (participantError) {
         console.error('Erreur lors de l\'ajout du participant:', participantError);
-        // On continue quand même car le voyage a été créé
+        setError('Le voyage a été créé mais l\'ajout en tant que participant a échoué');
+        setLoading(false);
+        return;
       }
 
       // Si une destination a été sélectionnée et que c'est un voyage "single", créer automatiquement l'étape
-      if (selectedDestination && type === 'single' && data.id) {
+      if (selectedDestination && type === 'single') {
         const { error: stageError } = await supabase.from('stages').insert({
-          trip_id: data.id,
+          trip_id: tripId,
           name: selectedDestination.name,
           order_index: 1,
           latitude: selectedDestination.lat,
@@ -298,6 +305,10 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
           // On continue quand même, l'utilisateur pourra ajouter l'étape manuellement
         }
       }
+    } else {
+      setError('Le voyage a été créé mais l\'ID n\'a pas pu être récupéré');
+      setLoading(false);
+      return;
     }
 
     setLoading(false);
