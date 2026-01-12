@@ -30,6 +30,24 @@ export function Dashboard() {
 
   const loadTrips = async () => {
     setLoading(true);
+    
+    // Essayer d'abord avec la fonction PostgreSQL qui évite la récursion
+    const { data: functionData, error: functionError } = await supabase.rpc('get_user_trips');
+    
+    if (!functionError && functionData) {
+      // Trier par date de création décroissante
+      const sortedTrips = functionData.sort((a: Trip, b: Trip) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateB - dateA;
+      });
+      setTrips(sortedTrips);
+      setLoading(false);
+      return;
+    }
+    
+    // Si la fonction n'existe pas, utiliser la méthode classique
+    console.log('Fonction get_user_trips non disponible, utilisation de la méthode classique');
     const { data, error } = await supabase
       .from('trips')
       .select('*')
@@ -37,7 +55,6 @@ export function Dashboard() {
 
     if (error) {
       console.error('Erreur lors du chargement des voyages:', error);
-      // Ne pas bloquer l'interface, juste logger l'erreur
     }
     
     if (data) {
