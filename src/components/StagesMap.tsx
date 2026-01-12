@@ -28,6 +28,16 @@ if (typeof window !== 'undefined') {
 export function StagesMap({ stages }: StagesMapProps) {
   const [isMounted, setIsMounted] = useState(false);
 
+  // Filtrer les étapes valides avec useMemo (AVANT les retours conditionnels)
+  const validStages = useMemo(() => {
+    return stages.filter(stage => 
+      typeof stage.latitude === 'number' && 
+      typeof stage.longitude === 'number' &&
+      !isNaN(stage.latitude) && 
+      !isNaN(stage.longitude)
+    );
+  }, [stages]);
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -43,7 +53,7 @@ export function StagesMap({ stages }: StagesMapProps) {
     );
   }
 
-  const firstStage = stages[0];
+  const firstStage = validStages[0];
   if (!firstStage || typeof firstStage.latitude !== 'number' || typeof firstStage.longitude !== 'number') {
     return (
       <div className="bg-cream rounded-button h-96 flex items-center justify-center">
@@ -53,16 +63,6 @@ export function StagesMap({ stages }: StagesMapProps) {
       </div>
     );
   }
-
-  // Filtrer les étapes valides avec useMemo
-  const validStages = useMemo(() => {
-    return stages.filter(stage => 
-      typeof stage.latitude === 'number' && 
-      typeof stage.longitude === 'number' &&
-      !isNaN(stage.latitude) && 
-      !isNaN(stage.longitude)
-    );
-  }, [stages]);
 
   return (
     <div className="rounded-button overflow-hidden" style={{ height: '384px' }}>
