@@ -228,7 +228,7 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       creator_id: user.id
     });
 
-    // Insérer le voyage sans select pour éviter la récursion RLS
+    // Insérer le voyage - on récupérera l'ID après avoir ajouté le participant
     const { data: insertData, error: insertError } = await supabase
       .from('trips')
       .insert({
@@ -238,9 +238,7 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
         end_date: endDate,
         type,
         creator_id: user.id
-      })
-      .select('id')
-      .single();
+      });
 
     if (insertError) {
       console.error('Erreur complète lors de la création du voyage:', {
@@ -254,7 +252,7 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       let errorMessage = 'Erreur lors de la création du voyage';
       
       if (insertError.code === '42P17' || insertError.message?.includes('infinite recursion')) {
-        errorMessage = 'Erreur de récursion dans les politiques RLS. Vérifiez la configuration Supabase.';
+        errorMessage = 'Erreur de récursion dans les politiques RLS. Veuillez exécuter le script de correction dans Supabase SQL Editor (fichier: 20260112000000_fix_rls_recursion.sql)';
       } else if (insertError.code === 'PGRST301' || insertError.message?.includes('permission denied')) {
         errorMessage = 'Erreur de permissions. Vérifiez que les politiques RLS sont correctement configurées dans Supabase.';
       } else if (insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
@@ -273,8 +271,27 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
       return;
     }
 
-    if (insertData?.id) {
-      const tripId = insertData.id;
+    // Récupérer l'ID du voyage créé en faisant une requête séparée
+    // On cherche le dernier voyage créé par cet utilisateur
+    const { data: newTrip, error: fetchError } = await supabase
+      .from('trips')
+      .select('id')
+      .eq('creator_id', user.id)
+      .eq('name', name.trim())
+      .eq('start_date', startDate)
+      .eq('end_date', endDate)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (fetchError || !newTrip) {
+      console.error('Erreur lors de la récupération du voyage créé:', fetchError);
+      setError('Le voyage a été créé mais n\'a pas pu être récupéré. Rafraîchissez la page.');
+      setLoading(false);
+      return;
+    }
+
+    const tripId = newTrip.id;
 
       // Ajouter le créateur comme participant avec permission d'édition
       const { error: participantError } = await supabase.from('trip_participants').insert({
