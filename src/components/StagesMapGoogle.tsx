@@ -1,12 +1,21 @@
 import { useEffect, useState, useMemo } from 'react';
 import { GoogleMap, useLoadScript, Marker, Polyline, InfoWindow } from '@react-google-maps/api';
 
+interface PointOfInterest {
+  title: string;
+  url: string;
+  needsTransport?: boolean;
+  lat?: number;
+  lng?: number;
+}
+
 interface Stage {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
   notes?: string | null;
+  points_of_interest?: PointOfInterest[] | null;
 }
 
 interface StagesMapGoogleProps {
@@ -184,6 +193,33 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
               )}
             </Marker>
           );
+        })}
+        {/* Marqueurs pour les points d'intérêt */}
+        {validStages.map((stage) => {
+          if (!stage.points_of_interest || stage.points_of_interest.length === 0) return null;
+          
+          return stage.points_of_interest
+            .filter(poi => poi.lat && poi.lng)
+            .map((poi, poiIndex) => {
+              const poiIconUrl = `data:image/svg+xml;base64,${btoa(`
+                <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" fill="#00B4D8" stroke="white" stroke-width="2"/>
+                  <path d="M12 6v6l4 2" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+                </svg>
+              `)}`;
+              
+              return (
+                <Marker
+                  key={`poi-${stage.id}-${poiIndex}`}
+                  position={{ lat: poi.lat!, lng: poi.lng! }}
+                  icon={{
+                    url: poiIconUrl,
+                    scaledSize: new google.maps.Size(24, 24),
+                    anchor: new google.maps.Point(12, 12)
+                  }}
+                />
+              );
+            });
         })}
         {validStages.length > 1 && (
           <Polyline

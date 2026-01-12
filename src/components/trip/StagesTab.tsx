@@ -12,6 +12,8 @@ interface PointOfInterest {
   title: string;
   url: string;
   needsTransport?: boolean;
+  lat?: number;
+  lng?: number;
 }
 
 interface Stage {
@@ -102,7 +104,7 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
           className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
         >
           <Plus className="w-5 h-5" />
-          <span>{tripType === 'roadtrip' ? 'Ajouter une étape' : 'Ajouter/modifier la destination'}</span>
+          <span>{tripType === 'roadtrip' ? 'Ajouter une étape' : 'Ajout d\'une activité'}</span>
         </button>
       </div>
 
@@ -149,6 +151,38 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                     <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
+
+                {/* Récapitulatif des activités pour les voyages "single" */}
+                {tripType === 'single' && stage.points_of_interest && stage.points_of_interest.length > 0 && (
+                  <div className="mb-4 bg-cream rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-dark-gray mb-3">Activités ({stage.points_of_interest.length})</h4>
+                    <div className="space-y-2">
+                      {stage.points_of_interest.map((poi, poiIndex) => (
+                        <div key={poiIndex} className="flex items-center justify-between bg-white rounded-lg p-2">
+                          <div className="flex items-center space-x-2 flex-1 min-w-0">
+                            <div className="w-2 h-2 bg-turquoise rounded-full flex-shrink-0"></div>
+                            <span className="text-sm text-dark-gray font-body truncate">{poi.title}</span>
+                            {poi.needsTransport && (
+                              <span className="text-xs bg-gold/20 text-gold px-2 py-0.5 rounded-full font-body flex items-center space-x-1 flex-shrink-0">
+                                <Car className="w-3 h-3" />
+                                <span>Transport</span>
+                              </span>
+                            )}
+                          </div>
+                          <a
+                            href={poi.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-turquoise hover:text-turquoise/80 ml-2 flex-shrink-0"
+                            title="Voir sur la carte"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {stage.accommodation_link && (
                   <div className="mb-3">
@@ -514,6 +548,25 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
               
               <button
                 type="button"
+                onClick={() => {
+                  // Ajouter le POI aux points d'intérêt avec ses coordonnées
+                  setPointsOfInterest([...pointsOfInterest, {
+                    title: selectedPoi.name,
+                    url: selectedPoi.url,
+                    lat: selectedPoi.lat,
+                    lng: selectedPoi.lng,
+                    needsTransport: false
+                  }]);
+                  setSelectedPoi(null);
+                  setShowPoiSearch(false);
+                }}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gold text-white rounded-button hover:bg-gold/90 transition-colors font-semibold"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Ajouter cette activité</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setSelectedPoiForTransport(selectedPoi)}
                 className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-turquoise text-white rounded-button hover:bg-turquoise/90 transition-colors font-semibold"
               >
@@ -712,12 +765,24 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
           useGeolocation={transportRouteDestination.useGeolocation}
           onClose={() => {
             setShowTransportRoute(false);
-            // Ajouter le point d'intérêt après avoir vu l'itinéraire
-            setPointsOfInterest([...pointsOfInterest, {
-              title: transportRouteDestination.name,
-              url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(transportRouteDestination.name)}`,
-              needsTransport: true
-            }]);
+            // Ajouter le point d'intérêt après avoir vu l'itinéraire avec les coordonnées
+            if (selectedPoi) {
+              setPointsOfInterest([...pointsOfInterest, {
+                title: transportRouteDestination.name,
+                url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(transportRouteDestination.name)}`,
+                lat: selectedPoi.lat,
+                lng: selectedPoi.lng,
+                needsTransport: true
+              }]);
+            } else {
+              setPointsOfInterest([...pointsOfInterest, {
+                title: transportRouteDestination.name,
+                url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(transportRouteDestination.name)}`,
+                lat: transportRouteDestination.lat,
+                lng: transportRouteDestination.lng,
+                needsTransport: true
+              }]);
+            }
             setSelectedPoi(null);
             setTransportRouteDestination(null);
           }}
