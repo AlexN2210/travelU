@@ -3,6 +3,12 @@ import { Plus, MapPin, Trash2, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { CityAutocomplete } from '../CityAutocomplete';
 import { StagesMap } from '../StagesMap';
+import { AIActivitySuggestions } from '../AIActivitySuggestions';
+
+interface PointOfInterest {
+  title: string;
+  url: string;
+}
 
 interface Stage {
   id: string;
@@ -14,6 +20,7 @@ interface Stage {
   accommodation_link: string | null;
   transport_to_next: string | null;
   notes: string | null;
+  points_of_interest: PointOfInterest[] | null;
 }
 
 interface StagesTabProps {
@@ -161,6 +168,26 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                   </div>
                 )}
 
+                {stage.points_of_interest && stage.points_of_interest.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-sm text-dark-gray/70 mb-2 font-semibold">Points d'intérêt:</p>
+                    <div className="space-y-2">
+                      {stage.points_of_interest.map((poi, poiIndex) => (
+                        <a
+                          key={poiIndex}
+                          href={poi.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-turquoise hover:text-turquoise/80 text-sm flex items-center space-x-1 font-body transition-colors block"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          <span>{poi.title}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {stage.notes && (
                   <div>
                     <p className="text-sm text-dark-gray/70 mb-1">Notes:</p>
@@ -215,12 +242,33 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
   const [accommodationLink, setAccommodationLink] = useState('');
   const [transportToNext, setTransportToNext] = useState('');
   const [notes, setNotes] = useState('');
+  const [pointsOfInterest, setPointsOfInterest] = useState<PointOfInterest[]>([]);
+  const [newPoiTitle, setNewPoiTitle] = useState('');
+  const [newPoiUrl, setNewPoiUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleDestinationSelect = (city: { name: string; lat: number; lon: number; display_name: string }) => {
     setSelectedDestination({ name: city.name, lat: city.lat, lon: city.lon });
     setName(city.name);
+  };
+
+  const handleAddPoi = () => {
+    if (newPoiTitle.trim() && newPoiUrl.trim()) {
+      // Vérifier que l'URL est valide
+      try {
+        new URL(newPoiUrl);
+        setPointsOfInterest([...pointsOfInterest, { title: newPoiTitle.trim(), url: newPoiUrl.trim() }]);
+        setNewPoiTitle('');
+        setNewPoiUrl('');
+      } catch {
+        setError('URL invalide');
+      }
+    }
+  };
+
+  const handleRemovePoi = (index: number) => {
+    setPointsOfInterest(pointsOfInterest.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -249,7 +297,8 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
         longitude: selectedDestination.lon,
         accommodation_link: accommodationLink || null,
         transport_to_next: transportToNext || null,
-        notes: notes || null
+        notes: notes || null,
+        points_of_interest: pointsOfInterest.length > 0 ? pointsOfInterest : null
       });
 
     if (insertError) {
@@ -310,6 +359,17 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
             )}
           </div>
 
+          {selectedDestination && (
+            <AIActivitySuggestions
+              cityName={name || selectedDestination.name}
+              latitude={selectedDestination.lat}
+              longitude={selectedDestination.lon}
+              onAddActivity={(activity) => {
+                setPointsOfInterest([...pointsOfInterest, activity]);
+              }}
+            />
+          )}
+
           <div>
             <label className="block text-sm font-medium text-dark-gray/80 mb-2">
               Lien hébergement (optionnel)
@@ -334,6 +394,74 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Ex: Train, Voiture, Avion..."
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-dark-gray/80 mb-2">
+              Points d'intérêt (musées, jardins, etc.) (optionnel)
+            </label>
+            <div className="space-y-2 mb-2">
+              {pointsOfInterest.map((poi, index) => (
+                <div key={index} className="flex items-center justify-between bg-cream rounded-lg p-2">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-dark-gray">{poi.title}</p>
+                    <a
+                      href={poi.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-turquoise hover:text-turquoise/80 flex items-center space-x-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span className="text-xs truncate max-w-xs">{poi.url}</span>
+                    </a>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePoi(index)}
+                    className="text-burnt-orange hover:text-burnt-orange/80 p-1 ml-2"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={newPoiTitle}
+                onChange={(e) => setNewPoiTitle(e.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: Musée du Louvre"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddPoi();
+                  }
+                }}
+              />
+              <input
+                type="url"
+                value={newPoiUrl}
+                onChange={(e) => setNewPoiUrl(e.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="https://..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddPoi();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddPoi}
+                className="px-4 py-2 bg-gold text-white font-semibold rounded-lg hover:bg-gold/90 transition-colors flex items-center space-x-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Ajouter</span>
+              </button>
+            </div>
           </div>
 
           <div>
