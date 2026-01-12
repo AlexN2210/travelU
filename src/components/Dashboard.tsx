@@ -381,6 +381,7 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
 
       // Si une destination a été sélectionnée et que c'est un voyage "single", créer automatiquement l'étape
       if (selectedDestination && type === 'single') {
+        console.log('Création de l\'étape pour destination unique:', selectedDestination);
         const { error: stageError } = await supabase.from('stages').insert({
           trip_id: tripId,
           name: selectedDestination.name,
@@ -398,7 +399,11 @@ function CreateTripModal({ onClose, onSuccess }: CreateTripModalProps) {
           });
           // On continue quand même, l'utilisateur pourra ajouter l'étape manuellement
           // Ne pas bloquer le succès de la création du voyage
+        } else {
+          console.log('Étape créée avec succès pour le voyage destination unique');
         }
+      } else {
+        console.log('Pas d\'étape créée automatiquement:', { selectedDestination: !!selectedDestination, type });
       }
 
     setLoading(false);

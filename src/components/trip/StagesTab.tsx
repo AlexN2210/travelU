@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { CityAutocomplete } from '../CityAutocomplete';
 
 // Corriger les icônes Leaflet par défaut (problème connu avec webpack/vite)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -47,8 +48,15 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
       .eq('trip_id', tripId)
       .order('order_index', { ascending: true });
 
-    if (!error && data) {
+    if (error) {
+      console.error('Erreur lors du chargement des étapes:', error);
+    }
+    
+    if (data) {
+      console.log('Étapes chargées:', data.length, data);
       setStages(data);
+    } else {
+      console.log('Aucune étape trouvée pour le voyage:', tripId);
     }
     setLoading(false);
   };
@@ -93,7 +101,7 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
           className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
         >
           <Plus className="w-5 h-5" />
-          <span>Ajouter une étape</span>
+          <span>{tripType === 'roadtrip' ? 'Ajouter une étape' : 'Ajouter/modifier la destination'}</span>
         </button>
       </div>
 
@@ -282,28 +290,29 @@ interface AddStageModalProps {
 
 function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModalProps) {
   const [name, setName] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
+  const [selectedDestination, setSelectedDestination] = useState<{ name: string; lat: number; lon: number } | null>(null);
   const [accommodationLink, setAccommodationLink] = useState('');
   const [transportToNext, setTransportToNext] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const handleDestinationSelect = (city: { name: string; lat: number; lon: number; display_name: string }) => {
+    setSelectedDestination({ name: city.name, lat: city.lat, lon: city.lon });
+    setName(city.name);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
-
-    if (isNaN(lat) || isNaN(lng)) {
-      setError('Coordonnées invalides');
+    if (!selectedDestination) {
+      setError('Veuillez sélectionner une destination');
       return;
     }
 
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      setError('Coordonnées hors limites');
+    if (!name.trim()) {
+      setError('Le nom de l\'étape est requis');
       return;
     }
 
@@ -313,17 +322,18 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
       .from('stages')
       .insert({
         trip_id: tripId,
-        name,
+        name: name.trim(),
         order_index: orderIndex,
-        latitude: lat,
-        longitude: lng,
+        latitude: selectedDestination.lat,
+        longitude: selectedDestination.lon,
         accommodation_link: accommodationLink || null,
         transport_to_next: transportToNext || null,
         notes: notes || null
       });
 
     if (insertError) {
-      setError('Erreur lors de l\'ajout de l\'étape');
+      console.error('Erreur lors de l\'ajout de l\'étape:', insertError);
+      setError(`Erreur lors de l'ajout de l'étape: ${insertError.message || 'Erreur inconnue'}`);
       setLoading(false);
       return;
     }
@@ -363,45 +373,20 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
 
           <div>
             <label className="block text-sm font-medium text-dark-gray/80 mb-2">
-              Nom de l'étape *
+              Destination *
             </label>
-            <input
-              type="text"
+            <CityAutocomplete
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Ex: Paris"
+              onChange={(value) => setName(value)}
+              onSelect={handleDestinationSelect}
+              placeholder="Rechercher une ville ou un pays..."
+              className="w-full"
             />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-dark-gray/80 mb-2">
-                Latitude *
-              </label>
-              <input
-                type="text"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="48.8566"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-dark-gray/80 mb-2">
-                Longitude *
-              </label>
-              <input
-                type="text"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="2.3522"
-              />
-            </div>
+            {selectedDestination && (
+              <p className="mt-2 text-sm text-dark-gray/60 font-body">
+                Coordonnées: {selectedDestination.lat.toFixed(4)}, {selectedDestination.lon.toFixed(4)}
+              </p>
+            )}
           </div>
 
           <div>
