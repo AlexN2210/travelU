@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, LogOut, MapPin } from 'lucide-react';
+import { Plus, LogOut, MapPin, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { TripView } from './TripView';
@@ -69,6 +69,31 @@ export function Dashboard() {
       month: 'long',
       year: 'numeric'
     });
+  };
+
+  const handleDeleteTrip = async (tripId: string, tripName: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Empêcher l'ouverture du voyage
+    
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer le voyage "${tripName}" ?\n\nCette action est irréversible et supprimera toutes les données associées (étapes, participants, dépenses, etc.).`)) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from('trips')
+      .delete()
+      .eq('id', tripId);
+
+    if (error) {
+      console.error('Erreur lors de la suppression du voyage:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      alert(`Erreur lors de la suppression: ${error.message || 'Erreur inconnue'}`);
+    } else {
+      loadTrips();
+    }
   };
 
   if (selectedTripId) {
@@ -149,19 +174,28 @@ export function Dashboard() {
               <div
                 key={trip.id}
                 onClick={() => setSelectedTripId(trip.id)}
-                className="bg-white rounded-2xl shadow-soft hover:shadow-medium transition-all cursor-pointer p-6 transform hover:-translate-y-1"
+                className="bg-white rounded-2xl shadow-soft hover:shadow-medium transition-all cursor-pointer p-6 transform hover:-translate-y-1 relative"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-xl font-heading font-semibold text-dark-gray">
+                  <h3 className="text-xl font-heading font-semibold text-dark-gray flex-1 pr-2">
                     {trip.name}
                   </h3>
-                  <span className={`px-3 py-1 text-xs font-heading font-semibold rounded-full ${
-                    trip.type === 'roadtrip'
-                      ? 'bg-palm-green/20 text-palm-green'
-                      : 'bg-turquoise/20 text-turquoise'
-                  }`}>
-                    {trip.type === 'roadtrip' ? 'Road trip' : 'Destination unique'}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-3 py-1 text-xs font-heading font-semibold rounded-full ${
+                      trip.type === 'roadtrip'
+                        ? 'bg-palm-green/20 text-palm-green'
+                        : 'bg-turquoise/20 text-turquoise'
+                    }`}>
+                      {trip.type === 'roadtrip' ? 'Road trip' : 'Destination unique'}
+                    </span>
+                    <button
+                      onClick={(e) => handleDeleteTrip(trip.id, trip.name, e)}
+                      className="text-burnt-orange hover:text-burnt-orange/80 p-2 transition-colors rounded-button hover:bg-cream flex-shrink-0"
+                      title="Supprimer ce voyage"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
                 {trip.description && (
                   <p className="text-dark-gray/70 font-body text-sm mb-4 line-clamp-2">
