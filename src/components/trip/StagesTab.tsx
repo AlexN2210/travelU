@@ -43,14 +43,22 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
   };
 
   const handleDeleteStage = async (stageId: string) => {
-    if (!confirm('Supprimer cette étape ?')) return;
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette étape ?')) return;
 
     const { error } = await supabase
       .from('stages')
       .delete()
       .eq('id', stageId);
 
-    if (!error) {
+    if (error) {
+      console.error('Erreur lors de la suppression de l\'étape:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      alert(`Erreur lors de la suppression: ${error.message || 'Erreur inconnue'}`);
+    } else {
       loadStages();
     }
   };
@@ -115,7 +123,8 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                   </div>
                   <button
                     onClick={() => handleDeleteStage(stage.id)}
-                    className="text-red-600 hover:text-red-700 p-2"
+                    className="text-burnt-orange hover:text-burnt-orange/80 p-2 transition-colors rounded-button hover:bg-cream"
+                    title="Supprimer cette étape"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
