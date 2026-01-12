@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
+import { useLoadScript } from '@react-google-maps/api';
 
 interface AddressInputProps {
   onSelect: (address: { address: string; lat: number; lng: number }) => void;
@@ -13,8 +14,25 @@ export function AddressInput({ onSelect, onCancel, placeholder = "Entrez votre a
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: apiKey || '',
+    libraries: ['places']
+  });
+
+  // Initialiser les services Google Places
+  useEffect(() => {
+    if (isLoaded && typeof google !== 'undefined' && google.maps && google.maps.places) {
+      autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
+      // Créer un div invisible pour PlacesService (requis par l'API)
+      const serviceDiv = document.createElement('div');
+      placesServiceRef.current = new google.maps.places.PlacesService(serviceDiv);
+    }
+  }, [isLoaded]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -26,35 +44,38 @@ export function AddressInput({ onSelect, onCancel, placeholder = "Entrez votre a
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const searchAddress = async (searchQuery: string) => {
+  const searchAddress = (searchQuery: string) => {
     if (searchQuery.length < 3) {
       setSuggestions([]);
       return;
     }
 
-    if (!apiKey) {
-      console.error('Clé API Google Maps manquante');
+    if (!autocompleteServiceRef.current || !isLoaded) {
+      console.error('Service Google Places non disponible');
       return;
     }
 
     setIsLoading(true);
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchQuery)}&key=${apiKey}&types=address&language=fr`
-      );
-      const data = await response.json();
 
-      if (data.predictions) {
-        setSuggestions(data.predictions.slice(0, 5));
+    const request: google.maps.places.AutocompletionRequest = {
+      input: searchQuery,
+      types: ['address'],
+      language: 'fr'
+    };
+
+    autocompleteServiceRef.current.getPlacePredictions(request, (predictions, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+        setSuggestions(predictions.slice(0, 5));
+      } else {
+        setSuggestions([]);
       }
-    } catch (error) {
-      console.error('Erreur lors de la recherche d\'adresse:', error);
-    } finally {
       setIsLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
+    if (!isLoaded) return;
+
     const timeoutId = setTimeout(() => {
       if (query) {
         searchAddress(query);
@@ -64,30 +85,51 @@ export function AddressInput({ onSelect, onCancel, placeholder = "Entrez votre a
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [query]);
+  }, [query, isLoaded]);
 
-  const handleSelectAddress = async (placeId: string, description: string) => {
-    if (!apiKey) return;
+  const handleSelectAddress = (prediction: google.maps.places.AutocompletePrediction) => {
+    if (!placesServiceRef.current) return;
 
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${apiKey}&fields=geometry,formatted_address`
-      );
-      const data = await response.json();
+    const detailsRequest: google.maps.places.PlaceDetailsRequest = {
+      placeId: prediction.place_id,
+      fields: ['geometry', 'formatted_address']
+    };
 
-      if (data.result && data.result.geometry) {
+    placesServiceRef.current.getDetails(detailsRequest, (place, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && place && place.geometry) {
         onSelect({
-          address: description,
-          lat: data.result.geometry.location.lat,
-          lng: data.result.geometry.location.lng
+          address: prediction.description,
+          lat: place.geometry.location?.lat() || 0,
+          lng: place.geometry.location?.lng() || 0
         });
         setQuery('');
         setShowSuggestions(false);
       }
-    } catch (error) {
-      console.error('Erreur lors de la récupération des détails:', error);
-    }
+    });
   };
+
+  if (!isLoaded) {
+    return (
+      <div className="space-y-3">
+        <div className="relative">
+          <input
+            type="text"
+            disabled
+            className="w-full px-4 py-2 pl-10 border border-cream rounded-button font-body opacity-50"
+            placeholder="Chargement..."
+          />
+          <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-dark-gray/40" />
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="w-full px-4 py-2 bg-dark-gray/10 text-dark-gray rounded-button hover:bg-dark-gray/20 transition-colors text-sm"
+        >
+          Annuler
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div ref={wrapperRef} className="space-y-3">
@@ -115,7 +157,7 @@ export function AddressInput({ onSelect, onCancel, placeholder = "Entrez votre a
             <button
               key={suggestion.place_id}
               type="button"
-              onClick={() => handleSelectAddress(suggestion.place_id, suggestion.description)}
+              onClick={() => handleSelectAddress(suggestion)}
               className="w-full text-left px-4 py-3 hover:bg-cream transition-colors border-b border-cream last:border-b-0"
             >
               <div className="flex items-start space-x-2">

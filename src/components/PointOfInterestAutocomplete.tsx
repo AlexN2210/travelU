@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPinned, Loader2, ExternalLink } from 'lucide-react';
+import { useLoadScript } from '@react-google-maps/api';
 
 interface PointOfInterest {
   place_id: string;
@@ -34,8 +35,25 @@ export function PointOfInterestAutocomplete({
   const [query, setQuery] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: apiKey || '',
+    libraries: ['places']
+  });
+
+  // Initialiser les services Google Places
+  useEffect(() => {
+    if (isLoaded && typeof google !== 'undefined' && google.maps && google.maps.places) {
+      autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
+      // Créer un div invisible pour PlacesService (requis par l'API)
+      const serviceDiv = document.createElement('div');
+      placesServiceRef.current = new google.maps.places.PlacesService(serviceDiv);
+    }
+  }, [isLoaded]);
 
   // Fermer les suggestions quand on clique en dehors
   useEffect(() => {
@@ -49,96 +67,86 @@ export function PointOfInterestAutocomplete({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Rechercher des points d'intérêt via Google Places API
-  const searchPOI = async (searchQuery: string) => {
+  // Rechercher des points d'intérêt via Google Places Autocomplete Service
+  const searchPOI = (searchQuery: string) => {
     if (searchQuery.length < 2) {
       setSuggestions([]);
       setIsLoading(false);
       return;
     }
 
-    if (!apiKey) {
-      console.error('Clé API Google Maps manquante');
+    if (!autocompleteServiceRef.current || !isLoaded) {
+      console.error('Service Google Places non disponible');
       return;
     }
 
     setIsLoading(true);
-    try {
-      // Essayer d'abord avec Autocomplete API
-      const locationBias = latitude && longitude 
-        ? `&location=${latitude},${longitude}&radius=10000`
-        : '';
-      
-      let autocompleteResponse;
-      try {
-        autocompleteResponse = await fetch(
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchQuery)}&key=${apiKey}&types=establishment|point_of_interest${locationBias}&language=fr`
-        );
-      } catch (err) {
-        console.warn('Erreur Autocomplete, utilisation de Text Search:', err);
-        autocompleteResponse = null;
-      }
-      
-      let suggestions: PointOfInterest[] = [];
-      
-      if (autocompleteResponse) {
-        const autocompleteData = await autocompleteResponse.json();
-        
-        if (autocompleteData.predictions && autocompleteData.predictions.length > 0) {
-          // Récupérer les détails pour chaque prédiction
-          const detailsPromises = autocompleteData.predictions.slice(0, 8).map(async (prediction: any) => {
-            try {
-              const detailsResponse = await fetch(
-                `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&key=${apiKey}&fields=name,formatted_address,geometry,types&language=fr`
-              );
-              const detailsData = await detailsResponse.json();
-              return detailsData.result;
-            } catch (err) {
-              console.warn('Erreur lors de la récupération des détails:', err);
-              return null;
-            }
-          });
 
-          const details = await Promise.all(detailsPromises);
-          suggestions = details.filter((d: any) => d !== undefined && d !== null) as PointOfInterest[];
-        }
-      }
-      
-      // Si Autocomplete ne donne pas de résultats, utiliser Text Search
-      if (suggestions.length === 0) {
-        const textSearchQuery = latitude && longitude
-          ? `${searchQuery} near ${latitude},${longitude}`
-          : searchQuery;
-        
-        const textSearchResponse = await fetch(
-          `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(textSearchQuery)}&key=${apiKey}&language=fr${latitude && longitude ? `&location=${latitude},${longitude}&radius=10000` : ''}`
-        );
-        
-        const textSearchData = await textSearchResponse.json();
-        
-        if (textSearchData.results && textSearchData.results.length > 0) {
-          suggestions = textSearchData.results.slice(0, 8).map((result: any) => ({
-            place_id: result.place_id,
-            name: result.name,
-            formatted_address: result.formatted_address || result.vicinity || '',
-            geometry: result.geometry,
-            types: result.types
-          }));
-        }
-      }
-      
-      setSuggestions(suggestions);
-      setSelectedIndex(-1);
-    } catch (error) {
-      console.error('Erreur lors de la recherche de points d\'intérêt:', error);
-      setSuggestions([]);
-    } finally {
-      setIsLoading(false);
+    const request: google.maps.places.AutocompletionRequest = {
+      input: searchQuery,
+      types: ['establishment', 'point_of_interest'],
+      language: 'fr'
+    };
+
+    // Ajouter un biais de localisation si disponible
+    if (latitude && longitude) {
+      request.location = new google.maps.LatLng(latitude, longitude);
+      request.radius = 10000;
     }
+
+    autocompleteServiceRef.current.getPlacePredictions(request, (predictions, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+        // Récupérer les détails pour chaque prédiction
+        const detailsPromises = predictions.slice(0, 8).map((prediction) => {
+          return new Promise<PointOfInterest | null>((resolve) => {
+            if (!placesServiceRef.current) {
+              resolve(null);
+              return;
+            }
+
+            const detailsRequest: google.maps.places.PlaceDetailsRequest = {
+              placeId: prediction.place_id,
+              fields: ['name', 'formatted_address', 'geometry', 'types']
+            };
+
+            placesServiceRef.current.getDetails(detailsRequest, (place, detailsStatus) => {
+              if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place) {
+                resolve({
+                  place_id: place.place_id || prediction.place_id,
+                  name: place.name || prediction.description,
+                  formatted_address: place.formatted_address || prediction.description,
+                  geometry: {
+                    location: {
+                      lat: place.geometry?.location?.lat() || 0,
+                      lng: place.geometry?.location?.lng() || 0
+                    }
+                  },
+                  types: place.types
+                });
+              } else {
+                resolve(null);
+              }
+            });
+          });
+        });
+
+        Promise.all(detailsPromises).then((details) => {
+          const validDetails = details.filter((d): d is PointOfInterest => d !== null);
+          setSuggestions(validDetails);
+          setSelectedIndex(-1);
+          setIsLoading(false);
+        });
+      } else {
+        setSuggestions([]);
+        setIsLoading(false);
+      }
+    });
   };
 
   // Debounce pour éviter trop de requêtes
   useEffect(() => {
+    if (!isLoaded) return;
+
     const timeoutId = setTimeout(() => {
       if (query) {
         searchPOI(query);
@@ -148,7 +156,7 @@ export function PointOfInterestAutocomplete({
     }, 300); // Attendre 300ms après la dernière frappe
 
     return () => clearTimeout(timeoutId);
-  }, [query]);
+  }, [query, isLoaded, latitude, longitude]);
 
   const handleSelect = (poi: PointOfInterest) => {
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}+${encodeURIComponent(poi.formatted_address)}&query_place_id=${poi.place_id}`;
@@ -218,6 +226,20 @@ export function PointOfInterestAutocomplete({
     }
     return '';
   };
+
+  if (!isLoaded) {
+    return (
+      <div className="relative">
+        <input
+          type="text"
+          disabled
+          className="w-full px-4 py-2 pl-10 border border-cream rounded-button font-body opacity-50"
+          placeholder="Chargement..."
+        />
+        <MapPinned className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-dark-gray/40" />
+      </div>
+    );
+  }
 
   return (
     <div ref={wrapperRef} className="relative">
