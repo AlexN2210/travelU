@@ -186,12 +186,11 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
             {stages.length > 0 ? (
               <div className="rounded-button overflow-hidden" style={{ height: '384px' }}>
                 <MapContainer
+                  key={`map-${stages.length}-${stages[0].id}`}
                   center={[stages[0].latitude, stages[0].longitude]}
                   zoom={stages.length === 1 ? 10 : stages.length === 2 ? 7 : 5}
                   style={{ height: '100%', width: '100%', zIndex: 0 }}
                   scrollWheelZoom={true}
-                  bounds={stages.length > 1 ? stages.map(s => [s.latitude, s.longitude] as [number, number]) : undefined}
-                  boundsOptions={{ padding: [20, 20] }}
                 >
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -199,31 +198,33 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                   />
                   {stages.map((stage, index) => {
                     // Créer une icône personnalisée avec un dégradé doré/turquoise
+                    const iconHtml = `
+                      <div style="
+                        background: linear-gradient(135deg, #FFC857 0%, #00B4D8 100%);
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 50%;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-weight: bold;
+                        font-size: 14px;
+                      ">${index + 1}</div>
+                    `;
+                    
                     const icon = L.divIcon({
                       className: 'custom-marker',
-                      html: `
-                        <div style="
-                          background: linear-gradient(135deg, #FFC857 0%, #00B4D8 100%);
-                          width: 32px;
-                          height: 32px;
-                          border-radius: 50%;
-                          border: 3px solid white;
-                          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                          display: flex;
-                          align-items: center;
-                          justify-content: center;
-                          color: white;
-                          font-weight: bold;
-                          font-size: 14px;
-                        ">${index + 1}</div>
-                      `,
+                      html: iconHtml,
                       iconSize: [32, 32],
                       iconAnchor: [16, 16],
                     });
 
                     return (
                       <Marker
-                        key={stage.id}
+                        key={`marker-${stage.id}`}
                         position={[stage.latitude, stage.longitude]}
                         icon={icon}
                       >
@@ -245,7 +246,8 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                   })}
                   {stages.length > 1 && (
                     <Polyline
-                      positions={stages.map(s => [s.latitude, s.longitude])}
+                      key={`polyline-${stages.length}`}
+                      positions={stages.map(s => [s.latitude, s.longitude] as [number, number])}
                       color="#FFC857"
                       weight={3}
                       opacity={0.7}
