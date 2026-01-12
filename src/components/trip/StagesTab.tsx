@@ -4,10 +4,13 @@ import { supabase } from '../../lib/supabase';
 import { CityAutocomplete } from '../CityAutocomplete';
 import { StagesMapGoogle } from '../StagesMapGoogle';
 import { AIActivitySuggestions } from '../AIActivitySuggestions';
+import { PointOfInterestAutocomplete } from '../PointOfInterestAutocomplete';
+import { TransportRoute } from '../TransportRoute';
 
 interface PointOfInterest {
   title: string;
   url: string;
+  needsTransport?: boolean;
 }
 
 interface Stage {
@@ -93,43 +96,14 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
         <h2 className="text-2xl font-bold text-dark-gray">
           {tripType === 'roadtrip' ? 'Étapes du road trip' : 'Destination'}
         </h2>
-        {tripType === 'roadtrip' && (
-          <button
-            onClick={() => setShowAddStage(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Ajouter une étape</span>
-          </button>
-        )}
+        <button
+          onClick={() => setShowAddStage(true)}
+          className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
+        >
+          <Plus className="w-5 h-5" />
+          <span>{tripType === 'roadtrip' ? 'Ajouter une étape' : 'Ajouter/modifier la destination'}</span>
+        </button>
       </div>
-
-      {/* Boutons pour single trip */}
-      {tripType === 'single' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <button
-            onClick={() => setShowAddStage(true)}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-turquoise rounded-button hover:bg-turquoise/10 transition-all shadow-soft hover:shadow-medium"
-          >
-            <MapPinned className="w-5 h-5 text-turquoise" />
-            <span className="font-body font-semibold text-dark-gray">Points d'intérêt</span>
-          </button>
-          <button
-            onClick={() => setShowAddStage(true)}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-gold rounded-button hover:bg-gold/10 transition-all shadow-soft hover:shadow-medium"
-          >
-            <Car className="w-5 h-5 text-gold" />
-            <span className="font-body font-semibold text-dark-gray">Transport</span>
-          </button>
-          <button
-            onClick={() => setShowAddStage(true)}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-white border-2 border-palm-green rounded-button hover:bg-palm-green/10 transition-all shadow-soft hover:shadow-medium"
-          >
-            <Hotel className="w-5 h-5 text-palm-green" />
-            <span className="font-body font-semibold text-dark-gray">Hébergement</span>
-          </button>
-        </div>
-      )}
 
       {stages.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
@@ -280,6 +254,9 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
   const [showPoiModal, setShowPoiModal] = useState(false);
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [showAccommodationModal, setShowAccommodationModal] = useState(false);
+  const [selectedPoiForTransport, setSelectedPoiForTransport] = useState<{ name: string; url: string; lat?: number; lng?: number } | null>(null);
+  const [showTransportRoute, setShowTransportRoute] = useState(false);
+  const [transportRouteDestination, setTransportRouteDestination] = useState<{ name: string; lat: number; lng: number } | null>(null);
 
   const handleDestinationSelect = (city: { name: string; lat: number; lon: number; display_name: string }) => {
     console.log('Destination sélectionnée:', city);
@@ -494,12 +471,45 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
               <button onClick={() => setShowPoiModal(false)} className="text-dark-gray/60 hover:text-dark-gray">✕</button>
             </div>
             <div className="space-y-4">
+              {/* Recherche avec autocomplétition */}
+              <div>
+                <label className="block text-sm font-medium text-dark-gray/80 mb-2">
+                  Rechercher un point d'intérêt
+                </label>
+                <PointOfInterestAutocomplete
+                  onSelect={(poi) => {
+                    // Ouvrir la modale de confirmation pour le transport
+                    setSelectedPoiForTransport({ 
+                      name: poi.name, 
+                      url: poi.url,
+                      lat: poi.lat,
+                      lng: poi.lng
+                    });
+                  }}
+                  latitude={selectedDestination?.lat}
+                  longitude={selectedDestination?.lon}
+                  placeholder="Rechercher un musée, parc, restaurant..."
+                />
+              </div>
+
+              {/* Liste des points d'intérêt ajoutés */}
               {pointsOfInterest.length > 0 && (
                 <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-dark-gray mb-2">
+                    Points d'intérêt ajoutés ({pointsOfInterest.length})
+                  </h4>
                   {pointsOfInterest.map((poi, index) => (
                     <div key={index} className="flex items-center justify-between bg-cream rounded-lg p-3">
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-dark-gray">{poi.title}</p>
+                        <div className="flex items-center space-x-2">
+                          <p className="text-sm font-medium text-dark-gray">{poi.title}</p>
+                          {poi.needsTransport && (
+                            <span className="text-xs bg-gold/20 text-gold px-2 py-0.5 rounded-full font-body flex items-center space-x-1">
+                              <Car className="w-3 h-3" />
+                              <span>Transport</span>
+                            </span>
+                          )}
+                        </div>
                         <a
                           href={poi.url}
                           target="_blank"
@@ -522,47 +532,114 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
                   ))}
                 </div>
               )}
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={newPoiTitle}
-                  onChange={(e) => setNewPoiTitle(e.target.value)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-turquoise focus:border-transparent"
-                  placeholder="Ex: Musée du Louvre"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddPoi();
-                    }
-                  }}
-                />
-                <input
-                  type="url"
-                  value={newPoiUrl}
-                  onChange={(e) => setNewPoiUrl(e.target.value)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-turquoise focus:border-transparent"
-                  placeholder="https://..."
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddPoi();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleAddPoi}
-                  className="px-4 py-2 bg-turquoise text-white rounded-button hover:bg-turquoise/90 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+
+              {/* Option manuelle (si besoin) */}
+              <div className="border-t border-cream pt-4">
+                <label className="block text-sm font-medium text-dark-gray/80 mb-2">
+                  Ou ajouter manuellement
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={newPoiTitle}
+                    onChange={(e) => setNewPoiTitle(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-turquoise focus:border-transparent"
+                    placeholder="Ex: Musée du Louvre"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddPoi();
+                      }
+                    }}
+                  />
+                  <input
+                    type="url"
+                    value={newPoiUrl}
+                    onChange={(e) => setNewPoiUrl(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-turquoise focus:border-transparent"
+                    placeholder="https://..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddPoi();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddPoi}
+                    className="px-4 py-2 bg-turquoise text-white rounded-button hover:bg-turquoise/90 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div className="flex justify-end">
+
+              <div className="flex justify-end pt-2">
                 <button
                   onClick={() => setShowPoiModal(false)}
                   className="px-4 py-2 bg-dark-gray text-white rounded-button hover:bg-dark-gray/90 transition-colors"
                 >
                   Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation pour le transport vers le point d'intérêt */}
+      {selectedPoiForTransport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm" onClick={() => setSelectedPoiForTransport(null)}>
+          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-dark-gray">Point d'intérêt sélectionné</h3>
+              <button onClick={() => setSelectedPoiForTransport(null)} className="text-dark-gray/60 hover:text-dark-gray">✕</button>
+            </div>
+            <div className="space-y-4">
+              <div className="bg-cream rounded-lg p-4">
+                <p className="font-semibold text-dark-gray mb-2">{selectedPoiForTransport.name}</p>
+                <p className="text-sm text-dark-gray/70 font-body">Voulez-vous connaître le transport pour vous y rendre ?</p>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    if (selectedPoiForTransport.lat && selectedPoiForTransport.lng) {
+                      // Afficher la modale de calcul d'itinéraire
+                      setTransportRouteDestination({
+                        name: selectedPoiForTransport.name,
+                        lat: selectedPoiForTransport.lat,
+                        lng: selectedPoiForTransport.lng
+                      });
+                      setShowTransportRoute(true);
+                      setSelectedPoiForTransport(null);
+                    } else {
+                      // Si pas de coordonnées, ajouter directement
+                      setPointsOfInterest([...pointsOfInterest, {
+                        title: selectedPoiForTransport.name,
+                        url: selectedPoiForTransport.url,
+                        needsTransport: true
+                      }]);
+                      setSelectedPoiForTransport(null);
+                    }
+                  }}
+                  className="flex-1 px-4 py-3 bg-turquoise text-white rounded-button hover:bg-turquoise/90 transition-colors font-semibold flex items-center justify-center space-x-2"
+                >
+                  <Car className="w-4 h-4" />
+                  <span>Oui, avec transport</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setPointsOfInterest([...pointsOfInterest, {
+                      title: selectedPoiForTransport.name,
+                      url: selectedPoiForTransport.url,
+                      needsTransport: false
+                    }]);
+                    setSelectedPoiForTransport(null);
+                  }}
+                  className="flex-1 px-4 py-3 bg-dark-gray/10 text-dark-gray rounded-button hover:bg-dark-gray/20 transition-colors font-semibold"
+                >
+                  Non, sans transport
                 </button>
               </div>
             </div>
@@ -597,6 +674,25 @@ function AddStageModal({ tripId, orderIndex, onClose, onSuccess }: AddStageModal
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Itinéraire Transport */}
+      {showTransportRoute && transportRouteDestination && (
+        <TransportRoute
+          destinationLat={transportRouteDestination.lat}
+          destinationLng={transportRouteDestination.lng}
+          destinationName={transportRouteDestination.name}
+          onClose={() => {
+            setShowTransportRoute(false);
+            // Ajouter le point d'intérêt après avoir vu l'itinéraire
+            setPointsOfInterest([...pointsOfInterest, {
+              title: transportRouteDestination.name,
+              url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(transportRouteDestination.name)}`,
+              needsTransport: true
+            }]);
+            setTransportRouteDestination(null);
+          }}
+        />
       )}
 
       {/* Modal Hébergement */}
