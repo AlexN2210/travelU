@@ -45,6 +45,19 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
 
   const loadStages = async () => {
     setLoading(true);
+    
+    // Essayer d'abord avec la fonction PostgreSQL qui bypass RLS
+    const { data: functionData, error: functionError } = await supabase
+      .rpc('get_trip_stages', { trip_uuid: tripId });
+
+    if (!functionError && functionData) {
+      console.log('Étapes chargées via fonction:', functionData.length, functionData);
+      setStages(functionData as Stage[]);
+      setLoading(false);
+      return;
+    }
+
+    // Si la fonction n'existe pas ou échoue, utiliser la méthode classique
     const { data, error } = await supabase
       .from('stages')
       .select('*')
