@@ -30,17 +30,20 @@ export function JoinTripPage() {
         return;
       }
 
-      const { data, error: tripError } = await supabase
-        .from('trips')
-        .select('name')
-        .eq('id', tripId)
-        .maybeSingle();
+      // Utiliser la fonction PostgreSQL pour vérifier l'existence du voyage
+      // Cela fonctionne même pour les utilisateurs non authentifiés
+      const { data: tripData, error: tripError } = await supabase
+        .rpc('check_trip_exists', { trip_uuid: tripId });
 
-      if (tripError || !data) {
+      if (tripError) {
+        console.error('Erreur lors de la vérification du voyage:', tripError);
+        setError('Erreur lors de la vérification du voyage. Le lien d\'invitation est peut-être invalide.');
+        setTripExists(false);
+      } else if (!tripData || !tripData.exists) {
         setError('Voyage introuvable. Le lien d\'invitation est peut-être invalide.');
         setTripExists(false);
       } else {
-        setTripName(data.name);
+        setTripName(tripData.name || 'Voyage');
         setTripExists(true);
       }
       setTripLoading(false);
