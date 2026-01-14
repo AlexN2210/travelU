@@ -138,27 +138,27 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
           </button>
         </div>
       ) : (
-        <div className="grid lg:grid-cols-2 gap-6">
-          <div className="space-y-4">
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 w-full">
+          <div className="space-y-4 w-full min-w-0">
             {stages.map((stage, index) => (
-              <div key={stage.id} className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-start space-x-3">
+              <div key={stage.id} className="bg-white rounded-lg shadow-sm p-4 sm:p-6 w-full overflow-hidden">
+                <div className="flex items-start justify-between mb-4 gap-2">
+                  <div className="flex items-start space-x-3 flex-1 min-w-0">
                     <div className="w-8 h-8 bg-gradient-to-br from-gold to-turquoise text-white rounded-full flex items-center justify-center font-bold flex-shrink-0 shadow-soft">
                       {index + 1}
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-dark-gray">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base sm:text-lg font-semibold text-dark-gray break-words">
                         {stage.name}
                       </h3>
-                      <p className="text-sm text-dark-gray/60">
+                      <p className="text-xs sm:text-sm text-dark-gray/60 break-all">
                         {stage.latitude.toFixed(4)}, {stage.longitude.toFixed(4)}
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => handleDeleteStage(stage.id)}
-                    className="text-burnt-orange hover:text-burnt-orange/80 p-2 transition-colors rounded-button hover:bg-cream"
+                    className="text-burnt-orange hover:text-burnt-orange/80 p-2 transition-colors rounded-button hover:bg-cream flex-shrink-0"
                     title="Supprimer cette étape"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -167,18 +167,18 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
 
                 {/* Récapitulatif des activités pour les voyages "single" */}
                 {tripType === 'single' && stage.points_of_interest && stage.points_of_interest.length > 0 && (
-                  <div className="mb-4 bg-cream rounded-lg p-4">
-                    <h4 className="text-sm font-semibold text-dark-gray mb-3">Activités ({stage.points_of_interest.length})</h4>
+                  <div className="mb-4 bg-cream rounded-lg p-3 sm:p-4 w-full overflow-hidden">
+                    <h4 className="text-xs sm:text-sm font-semibold text-dark-gray mb-3 break-words">Activités ({stage.points_of_interest.length})</h4>
                     <div className="space-y-2">
                       {stage.points_of_interest.map((poi, poiIndex) => (
-                        <div key={poiIndex} className="flex items-center justify-between bg-white rounded-lg p-2">
+                        <div key={poiIndex} className="flex items-center justify-between bg-white rounded-lg p-2 gap-2 w-full overflow-hidden">
                           <div className="flex items-center space-x-2 flex-1 min-w-0">
                             <div className="w-2 h-2 bg-turquoise rounded-full flex-shrink-0"></div>
-                            <span className="text-sm text-dark-gray font-body truncate">{poi.title}</span>
+                            <span className="text-xs sm:text-sm text-dark-gray font-body break-words">{poi.title}</span>
                             {poi.needsTransport && (
-                              <span className="text-xs bg-gold/20 text-gold px-2 py-0.5 rounded-full font-body flex items-center space-x-1 flex-shrink-0">
+                              <span className="text-xs bg-gold/20 text-gold px-1.5 sm:px-2 py-0.5 rounded-full font-body flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
                                 <Car className="w-3 h-3" />
-                                <span>Transport</span>
+                                <span className="hidden sm:inline">Transport</span>
                               </span>
                             )}
                           </div>
@@ -249,15 +249,17 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
             ))}
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-6">
-            <h3 className="text-lg font-semibold text-dark-gray mb-4">Carte</h3>
+          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 h-fit lg:sticky lg:top-6 w-full overflow-hidden">
+            <h3 className="text-base sm:text-lg font-semibold text-dark-gray mb-4 break-words">Carte</h3>
             {stages.length > 0 ? (
-              <StagesMapGoogle stages={stages} />
+              <div className="w-full overflow-hidden">
+                <StagesMapGoogle stages={stages} />
+              </div>
             ) : (
-              <div className="bg-cream rounded-button h-96 flex items-center justify-center">
+              <div className="bg-cream rounded-button h-64 sm:h-96 flex items-center justify-center w-full">
                 <div className="text-center text-dark-gray/60 font-body">
                   <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>Aucune étape à afficher</p>
+                  <p className="text-sm sm:text-base">Aucune étape à afficher</p>
                 </div>
               </div>
             )}
@@ -431,8 +433,8 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
         }
       }}
     >
-      <div className="bg-white rounded-2xl shadow-medium max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content">
-        <h2 className="text-2xl font-bold text-dark-gray mb-6">
+      <div className="bg-white rounded-2xl shadow-medium max-w-2xl w-full p-4 sm:p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content mx-4 sm:mx-0">
+        <h2 className="text-xl sm:text-2xl font-bold text-dark-gray mb-4 sm:mb-6 break-words">
           Ajouter une étape
         </h2>
 
@@ -629,7 +631,7 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
           setSelectedPoiForTransport(null);
           setSelectedPoi(null);
         }}>
-          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-4 sm:p-6 modal-content mx-4 sm:mx-0" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-dark-gray">Transport vers {selectedPoiForTransport.name}</h3>
               <button onClick={() => {
@@ -698,7 +700,7 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
           setShowAddressInput(false);
           setSelectedPoiForTransport(null);
         }}>
-          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-4 sm:p-6 modal-content mx-4 sm:mx-0" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-dark-gray">Adresse de départ</h3>
               <button onClick={() => {
@@ -741,7 +743,7 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
       {/* Modal Transport */}
       {showTransportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm" onClick={() => setShowTransportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-4 sm:p-6 modal-content mx-4 sm:mx-0" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-dark-gray">Transport vers la prochaine étape</h3>
               <button onClick={() => setShowTransportModal(false)} className="text-dark-gray/60 hover:text-dark-gray">✕</button>
@@ -805,7 +807,7 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
       {/* Modal Hébergement */}
       {showAccommodationModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm" onClick={() => setShowAccommodationModal(false)}>
-          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-4 sm:p-6 modal-content mx-4 sm:mx-0" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-dark-gray">Lien hébergement</h3>
               <button onClick={() => setShowAccommodationModal(false)} className="text-dark-gray/60 hover:text-dark-gray">✕</button>

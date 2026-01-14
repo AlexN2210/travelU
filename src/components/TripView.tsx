@@ -98,27 +98,27 @@ export function TripView({ tripId, onBack }: TripViewProps) {
 
   return (
     <div className="min-h-screen bg-cream font-body">
-      <div className="bg-white shadow-soft">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="bg-white shadow-soft w-full overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 w-full">
           <button
             onClick={onBack}
             className="flex items-center space-x-2 text-dark-gray/70 hover:text-dark-gray mb-4 font-body transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 flex-shrink-0" />
             <span>Retour</span>
           </button>
 
           <div className="mb-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-heading font-bold text-dark-gray mb-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-heading font-bold text-dark-gray mb-2 break-words">
                   {trip.name}
                 </h1>
                 {trip.description && (
-                  <p className="text-dark-gray/70 font-body">{trip.description}</p>
+                  <p className="text-dark-gray/70 font-body break-words">{trip.description}</p>
                 )}
               </div>
-              <span className={`px-4 py-2 text-sm font-heading font-semibold rounded-full ${
+              <span className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-heading font-semibold rounded-full whitespace-nowrap flex-shrink-0 ${
                 trip.type === 'roadtrip'
                   ? 'bg-palm-green/20 text-palm-green'
                   : 'bg-turquoise/20 text-turquoise'
@@ -126,33 +126,33 @@ export function TripView({ tripId, onBack }: TripViewProps) {
                 {trip.type === 'roadtrip' ? 'Road trip' : 'Destination unique'}
               </span>
             </div>
-            <div className="flex items-center space-x-4 text-sm text-dark-gray/60 mt-4 font-body">
-              <span>
+            <div className="flex items-center space-x-4 text-xs sm:text-sm text-dark-gray/60 mt-4 font-body flex-wrap">
+              <span className="break-words">
                 {new Date(trip.start_date).toLocaleDateString('fr-FR')} - {new Date(trip.end_date).toLocaleDateString('fr-FR')}
               </span>
             </div>
           </div>
 
-          <div className="flex space-x-1 overflow-x-auto">
+          <div className="flex space-x-1 overflow-x-auto pb-2 -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as Tab)}
-                className={`flex items-center space-x-2 px-6 py-3 font-body font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                className={`flex items-center space-x-2 px-4 sm:px-6 py-3 font-body font-medium rounded-t-lg transition-colors whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab.id
                     ? 'bg-cream text-turquoise border-b-2 border-turquoise'
                     : 'text-dark-gray/70 hover:text-dark-gray'
                 }`}
               >
                 {tab.icon}
-                <span>{tab.label}</span>
+                <span className="text-sm sm:text-base">{tab.label}</span>
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full overflow-x-hidden">
         {activeTab === 'stages' && <StagesTab tripId={tripId} tripType={trip.type} />}
         {activeTab === 'participants' && <ParticipantsTab tripId={tripId} creatorId={trip.creator_id} />}
         {activeTab === 'voting' && <VotingTab tripId={tripId} />}

@@ -100,21 +100,21 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-cream font-body">
       <nav className="bg-white shadow-soft">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 w-full overflow-x-hidden">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex items-center space-x-3">
               <img 
                 src={logo} 
                 alt="TravelU Logo" 
-                className="w-10 h-10 object-contain"
+                className="w-10 h-10 object-contain flex-shrink-0"
               />
-              <h1 className="text-2xl font-heading font-bold text-dark-gray">TravelU</h1>
+              <h1 className="text-xl sm:text-2xl font-heading font-bold text-dark-gray break-words">TravelU</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-dark-gray font-body">{user?.email}</span>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+              <span className="text-sm sm:text-base text-dark-gray font-body break-all sm:break-normal">{user?.email}</span>
               <button
                 onClick={signOut}
-                className="flex items-center space-x-2 px-4 py-2.5 text-dark-gray hover:text-turquoise font-body font-medium transition-colors rounded-button"
+                className="flex items-center space-x-2 px-4 py-2.5 text-dark-gray hover:text-turquoise font-body font-medium transition-colors rounded-button text-sm sm:text-base whitespace-nowrap"
               >
                 <LogOut className="w-5 h-5" />
                 <span>Déconnexion</span>
@@ -124,12 +124,12 @@ export function Dashboard() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl font-heading font-bold text-dark-gray">Mes voyages</h2>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <h2 className="text-2xl sm:text-3xl font-heading font-bold text-dark-gray break-words">Mes voyages</h2>
           <button
             onClick={() => setShowCreateTrip(true)}
-            className="flex items-center space-x-2 px-6 py-3 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
+            className="flex items-center space-x-2 px-4 sm:px-6 py-2 sm:py-3 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide text-sm sm:text-base whitespace-nowrap w-full sm:w-auto justify-center"
           >
             <Plus className="w-5 h-5" />
             <span>Nouveau voyage</span>
@@ -158,19 +158,19 @@ export function Dashboard() {
             </button>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full">
             {trips.map((trip) => (
               <div
                 key={trip.id}
                 onClick={() => navigate(`/trip/${trip.id}`)}
-                className="bg-white rounded-2xl shadow-soft hover:shadow-medium transition-all cursor-pointer p-6 transform hover:-translate-y-1 relative"
+                className="bg-white rounded-2xl shadow-soft hover:shadow-medium transition-all cursor-pointer p-4 sm:p-6 transform hover:-translate-y-1 relative w-full overflow-hidden"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-xl font-heading font-semibold text-dark-gray flex-1 pr-2">
+                <div className="flex items-start justify-between mb-3 gap-2">
+                  <h3 className="text-lg sm:text-xl font-heading font-semibold text-dark-gray flex-1 pr-2 break-words min-w-0">
                     {trip.name}
                   </h3>
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-3 py-1 text-xs font-heading font-semibold rounded-full ${
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <span className={`px-2 sm:px-3 py-1 text-xs font-heading font-semibold rounded-full whitespace-nowrap ${
                       trip.type === 'roadtrip'
                         ? 'bg-palm-green/20 text-palm-green'
                         : 'bg-turquoise/20 text-turquoise'
@@ -187,13 +187,13 @@ export function Dashboard() {
                   </div>
                 </div>
                 {trip.description && (
-                  <p className="text-dark-gray/70 font-body text-sm mb-4 line-clamp-2">
+                  <p className="text-dark-gray/70 font-body text-sm mb-4 line-clamp-2 break-words">
                     {trip.description}
                   </p>
                 )}
-                <div className="flex items-center text-sm text-dark-gray/60 font-body">
-                  <MapPin className="w-4 h-4 mr-2 text-turquoise" />
-                  {formatDate(trip.start_date)} - {formatDate(trip.end_date)}
+                <div className="flex items-center text-xs sm:text-sm text-dark-gray/60 font-body flex-wrap gap-1">
+                  <MapPin className="w-4 h-4 text-turquoise flex-shrink-0" />
+                  <span className="break-words">{formatDate(trip.start_date)} - {formatDate(trip.end_date)}</span>
                 </div>
               </div>
             ))}

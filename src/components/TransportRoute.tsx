@@ -181,7 +181,7 @@ export function TransportRoute({ destinationLat, destinationLng, destinationName
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-medium max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto smooth-scroll modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-medium max-w-2xl w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto smooth-scroll modal-content mx-4 sm:mx-0" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-bold text-dark-gray">Itinéraire vers {destinationName}</h3>
           <button onClick={onClose} className="text-dark-gray/60 hover:text-dark-gray">✕</button>

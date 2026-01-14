@@ -157,21 +157,21 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
           <p className="text-dark-gray/70 font-body">Aucun participant pour le moment</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-soft divide-y divide-cream">
+        <div className="bg-white rounded-xl shadow-soft divide-y divide-cream w-full overflow-hidden">
           {participants.map((participant) => (
-            <div key={participant.id} className="p-6 flex items-center justify-between hover:bg-cream/30 transition-colors">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-turquoise/20 rounded-full flex items-center justify-center">
-                  <Users className="w-6 h-6 text-turquoise" />
+            <div key={participant.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 hover:bg-cream/30 transition-colors w-full overflow-hidden">
+              <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0 w-full sm:w-auto">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-turquoise/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Users className="w-5 h-5 sm:w-6 sm:h-6 text-turquoise" />
                 </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <p className="font-body font-medium text-dark-gray">{participant.user_email}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 gap-1">
+                    <p className="font-body font-medium text-dark-gray break-all sm:break-normal text-sm sm:text-base">{participant.user_email}</p>
                     {participant.user_id === creatorId && (
-                      <Crown className="w-4 h-4 text-gold" title="Créateur du voyage" />
+                      <Crown className="w-4 h-4 text-gold flex-shrink-0" title="Créateur du voyage" />
                     )}
                   </div>
-                  <p className="text-sm text-dark-gray/60 font-body">
+                  <p className="text-xs sm:text-sm text-dark-gray/60 font-body break-words">
                     Rejoint le {new Date(participant.joined_at).toLocaleDateString('fr-FR', {
                       day: 'numeric',
                       month: 'long',
@@ -181,7 +181,7 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0 w-full sm:w-auto justify-end sm:justify-start">
                 {isCreator && participant.user_id !== creatorId && (
                   <>
                     <select
@@ -217,24 +217,24 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
       )}
 
       {isCreator && (
-        <div className="bg-cream/50 border border-turquoise/30 rounded-xl p-6">
-          <h3 className="font-heading font-semibold text-dark-gray mb-2">Lien d'invitation</h3>
-          <p className="text-sm text-dark-gray/70 font-body mb-4">
+        <div className="bg-cream/50 border border-turquoise/30 rounded-xl p-4 sm:p-6 w-full overflow-hidden">
+          <h3 className="font-heading font-semibold text-dark-gray mb-2 text-base sm:text-lg break-words">Lien d'invitation</h3>
+          <p className="text-xs sm:text-sm text-dark-gray/70 font-body mb-4 break-words">
             Partagez ce lien avec vos amis pour les inviter à rejoindre le voyage
           </p>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2">
             <input
               type="text"
               readOnly
               value={`${window.location.origin}/join/${tripId}`}
-              className="flex-1 px-4 py-2 bg-white border border-turquoise/30 rounded-button text-sm font-body text-dark-gray"
+              className="flex-1 px-3 sm:px-4 py-2 bg-white border border-turquoise/30 rounded-button text-xs sm:text-sm font-body text-dark-gray break-all min-w-0"
             />
             <button
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/join/${tripId}`);
                 alert('Lien copié dans le presse-papiers !');
               }}
-              className="px-4 py-2 bg-turquoise text-white font-body font-semibold rounded-button hover:bg-turquoise/90 transition-colors shadow-soft"
+              className="px-4 py-2 bg-turquoise text-white font-body font-semibold rounded-button hover:bg-turquoise/90 transition-colors shadow-soft whitespace-nowrap text-sm sm:text-base"
             >
               Copier
             </button>
@@ -333,7 +333,7 @@ function InviteModal({ tripId, onClose, onSuccess }: InviteModalProps) {
         }
       }}
     >
-      <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content">
+      <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-4 sm:p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content mx-4 sm:mx-0">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-heading font-bold text-dark-gray">
             Inviter un participant
