@@ -35,6 +35,18 @@ export function TripView({ tripId, onBack }: TripViewProps) {
 
   const loadTrip = async () => {
     setLoading(true);
+    
+    // Essayer d'abord avec la fonction PostgreSQL qui bypass RLS
+    const { data: functionData, error: functionError } = await supabase
+      .rpc('get_trip_by_id', { trip_uuid: tripId });
+
+    if (!functionError && functionData && functionData.length > 0) {
+      setTrip(functionData[0] as Trip);
+      setLoading(false);
+      return;
+    }
+
+    // Si la fonction n'existe pas ou échoue, utiliser la méthode classique
     const { data, error } = await supabase
       .from('trips')
       .select('*')
@@ -43,6 +55,8 @@ export function TripView({ tripId, onBack }: TripViewProps) {
 
     if (!error && data) {
       setTrip(data);
+    } else if (error) {
+      console.error('Erreur lors du chargement du voyage:', error);
     }
     setLoading(false);
   };
