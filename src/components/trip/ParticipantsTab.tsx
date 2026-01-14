@@ -36,15 +36,33 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
       .eq('trip_id', tripId);
 
     if (!error && participantsData) {
-      // Récupérer les emails via la table auth.users (accessible via RLS)
-      // Note: On ne peut pas utiliser admin.getUserById côté client
-      const participantsWithEmails = participantsData.map((participant) => {
-        return {
-          ...participant,
-          user_email: participant.user_id === user?.id ? user.email : 'Utilisateur'
-        };
-      });
+      // Récupérer les emails via la fonction PostgreSQL
+      const participantsWithEmails = await Promise.all(
+        participantsData.map(async (participant) => {
+          let userEmail = 'Utilisateur';
+          
+          // Si c'est l'utilisateur actuel, utiliser son email directement
+          if (participant.user_id === user?.id) {
+            userEmail = user.email || 'Utilisateur';
+          } else {
+            // Sinon, utiliser la fonction PostgreSQL pour récupérer l'email
+            const { data: emailData, error: emailError } = await supabase
+              .rpc('get_user_email', { user_uuid: participant.user_id });
+            
+            if (!emailError && emailData) {
+              userEmail = emailData;
+            }
+          }
+          
+          return {
+            ...participant,
+            user_email: userEmail
+          };
+        })
+      );
       setParticipants(participantsWithEmails);
+    } else if (error) {
+      console.error('Erreur lors du chargement des participants:', error);
     }
     setLoading(false);
   };
@@ -76,7 +94,8 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <div className="w-12 h-12 border-4 border-turquoise border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <p className="mt-4 text-dark-gray/70 font-body">Chargement des participants...</p>
       </div>
     );
   }
@@ -84,7 +103,7 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Participants</h2>
+        <h2 className="text-2xl font-heading font-bold text-dark-gray">Participants</h2>
         {isCreator && (
           <button
             onClick={() => setShowInvite(true)}
@@ -96,82 +115,96 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm divide-y">
-        {participants.map((participant) => (
-          <div key={participant.id} className="p-6 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-turquoise/20 rounded-full flex items-center justify-center">
-                <Users className="w-6 h-6 text-turquoise" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <p className="font-medium text-gray-900">{participant.user_email}</p>
-                  {participant.user_id === creatorId && (
-                    <Crown className="w-4 h-4 text-yellow-500" />
-                  )}
-                </div>
-                <p className="text-sm text-gray-500">
-                  Rejoint le {new Date(participant.joined_at).toLocaleDateString('fr-FR')}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              {isCreator && participant.user_id !== creatorId && (
-                <>
-                  <select
-                    value={participant.permission}
-                    onChange={(e) => handleChangePermission(participant.id, e.target.value as 'read' | 'edit')}
-                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="read">Lecture</option>
-                    <option value="edit">Édition</option>
-                  </select>
-                  <button
-                    onClick={() => handleRemoveParticipant(participant.id)}
-                    className="text-red-600 hover:text-red-700 p-2"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </>
-              )}
-              {!isCreator && (
-                <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                  participant.permission === 'edit'
-                    ? 'bg-palm-green/20 text-palm-green'
-                    : 'bg-cream text-dark-gray/70'
-                }`}>
-                  {participant.permission === 'edit' ? 'Éditeur' : 'Lecteur'}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="font-semibold text-blue-900 mb-2">Lien d'invitation</h3>
-        <p className="text-sm text-blue-700 mb-4">
-          Partagez ce lien avec vos amis pour les inviter à rejoindre le voyage
-        </p>
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            readOnly
-            value={`${window.location.origin}/join/${tripId}`}
-            className="flex-1 px-4 py-2 bg-white border border-blue-300 rounded-lg text-sm"
-          />
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/join/${tripId}`);
-              alert('Lien copié !');
-            }}
-            className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Copier
-          </button>
+      {participants.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-soft p-8 text-center">
+          <Users className="w-12 h-12 text-dark-gray/30 mx-auto mb-4" />
+          <p className="text-dark-gray/70 font-body">Aucun participant pour le moment</p>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-soft divide-y divide-cream">
+          {participants.map((participant) => (
+            <div key={participant.id} className="p-6 flex items-center justify-between hover:bg-cream/30 transition-colors">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-turquoise/20 rounded-full flex items-center justify-center">
+                  <Users className="w-6 h-6 text-turquoise" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <p className="font-body font-medium text-dark-gray">{participant.user_email}</p>
+                    {participant.user_id === creatorId && (
+                      <Crown className="w-4 h-4 text-gold" title="Créateur du voyage" />
+                    )}
+                  </div>
+                  <p className="text-sm text-dark-gray/60 font-body">
+                    Rejoint le {new Date(participant.joined_at).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                {isCreator && participant.user_id !== creatorId && (
+                  <>
+                    <select
+                      value={participant.permission}
+                      onChange={(e) => handleChangePermission(participant.id, e.target.value as 'read' | 'edit')}
+                      className="px-3 py-1.5 border border-cream rounded-button text-sm font-body focus:ring-2 focus:ring-turquoise focus:border-transparent bg-white text-dark-gray"
+                    >
+                      <option value="read">Lecture</option>
+                      <option value="edit">Édition</option>
+                    </select>
+                    <button
+                      onClick={() => handleRemoveParticipant(participant.id)}
+                      className="text-burnt-orange hover:text-burnt-orange/80 p-2 transition-colors"
+                      title="Retirer ce participant"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+                {!isCreator && (
+                  <span className={`px-3 py-1.5 text-sm font-body font-medium rounded-full ${
+                    participant.permission === 'edit'
+                      ? 'bg-palm-green/20 text-palm-green'
+                      : 'bg-cream text-dark-gray/70'
+                  }`}>
+                    {participant.permission === 'edit' ? 'Éditeur' : 'Lecteur'}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isCreator && (
+        <div className="bg-cream/50 border border-turquoise/30 rounded-xl p-6">
+          <h3 className="font-heading font-semibold text-dark-gray mb-2">Lien d'invitation</h3>
+          <p className="text-sm text-dark-gray/70 font-body mb-4">
+            Partagez ce lien avec vos amis pour les inviter à rejoindre le voyage
+          </p>
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              readOnly
+              value={`${window.location.origin}/join/${tripId}`}
+              className="flex-1 px-4 py-2 bg-white border border-turquoise/30 rounded-button text-sm font-body text-dark-gray"
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/join/${tripId}`);
+                alert('Lien copié dans le presse-papiers !');
+              }}
+              className="px-4 py-2 bg-turquoise text-white font-body font-semibold rounded-button hover:bg-turquoise/90 transition-colors shadow-soft"
+            >
+              Copier
+            </button>
+          </div>
+        </div>
+      )}
 
       {showInvite && (
         <InviteModal
@@ -204,14 +237,26 @@ function InviteModal({ tripId, onClose, onSuccess }: InviteModalProps) {
     setError('');
     setLoading(true);
 
-    const { data: users, error: userError } = await supabase
-      .from('auth.users')
+    // Utiliser la fonction PostgreSQL pour trouver l'utilisateur par email
+    const { data: userId, error: userError } = await supabase
+      .rpc('find_user_by_email', { user_email: email });
+
+    if (userError || !userId) {
+      setError('Utilisateur non trouvé avec cet email. Assurez-vous que l\'utilisateur a un compte TravelU.');
+      setLoading(false);
+      return;
+    }
+
+    // Vérifier si l'utilisateur est déjà participant
+    const { data: existingParticipant } = await supabase
+      .from('trip_participants')
       .select('id')
-      .eq('email', email)
+      .eq('trip_id', tripId)
+      .eq('user_id', userId)
       .maybeSingle();
 
-    if (userError || !users) {
-      setError('Utilisateur non trouvé avec cet email');
+    if (existingParticipant) {
+      setError('Cet utilisateur est déjà participant à ce voyage.');
       setLoading(false);
       return;
     }
@@ -220,12 +265,13 @@ function InviteModal({ tripId, onClose, onSuccess }: InviteModalProps) {
       .from('trip_participants')
       .insert({
         trip_id: tripId,
-        user_id: users.id,
+        user_id: userId,
         permission
       });
 
     if (insertError) {
-      setError('Erreur lors de l\'invitation. L\'utilisateur est peut-être déjà participant.');
+      console.error('Erreur lors de l\'invitation:', insertError);
+      setError('Erreur lors de l\'invitation. Veuillez réessayer.');
       setLoading(false);
       return;
     }
@@ -252,19 +298,27 @@ function InviteModal({ tripId, onClose, onSuccess }: InviteModalProps) {
       }}
     >
       <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Inviter un participant
-        </h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-heading font-bold text-dark-gray">
+            Inviter un participant
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-dark-gray/60 hover:text-dark-gray transition-colors"
+          >
+            ✕
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm font-body">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-body font-medium text-dark-gray mb-2">
               Email *
             </label>
             <input
@@ -272,37 +326,43 @@ function InviteModal({ tripId, onClose, onSuccess }: InviteModalProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent font-body text-dark-gray"
               placeholder="participant@email.com"
             />
+            <p className="text-xs text-dark-gray/60 mt-1 font-body">
+              L'utilisateur doit avoir un compte TravelU avec cet email
+            </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-body font-medium text-dark-gray mb-2">
               Permission
             </label>
             <select
               value={permission}
               onChange={(e) => setPermission(e.target.value as 'read' | 'edit')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent font-body text-dark-gray bg-white"
             >
               <option value="read">Lecture seule</option>
               <option value="edit">Édition</option>
             </select>
+            <p className="text-xs text-dark-gray/60 mt-1 font-body">
+              Les éditeurs peuvent modifier le voyage, les lecteurs peuvent seulement consulter
+            </p>
           </div>
 
           <div className="flex justify-end space-x-4 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 text-gray-700 hover:text-gray-900 font-medium"
+              className="px-6 py-2 text-dark-gray/70 hover:text-dark-gray font-body font-medium transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-6 py-2 bg-turquoise text-white font-body font-semibold rounded-button hover:bg-turquoise/90 transition-colors disabled:opacity-50 shadow-soft"
             >
               {loading ? 'Invitation...' : 'Inviter'}
             </button>

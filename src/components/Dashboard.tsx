@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, LogOut, MapPin, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { TripView } from './TripView';
 import { CityAutocomplete } from './CityAutocomplete';
 import logo from '../public/logo.png';
 
@@ -19,9 +19,9 @@ interface Trip {
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [showCreateTrip, setShowCreateTrip] = useState(false);
 
   useEffect(() => {
@@ -96,17 +96,6 @@ export function Dashboard() {
     }
   };
 
-  if (selectedTripId) {
-    return (
-      <TripView
-        tripId={selectedTripId}
-        onBack={() => {
-          setSelectedTripId(null);
-          loadTrips();
-        }}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-cream font-body">
@@ -173,7 +162,7 @@ export function Dashboard() {
             {trips.map((trip) => (
               <div
                 key={trip.id}
-                onClick={() => setSelectedTripId(trip.id)}
+                onClick={() => navigate(`/trip/${trip.id}`)}
                 className="bg-white rounded-2xl shadow-soft hover:shadow-medium transition-all cursor-pointer p-6 transform hover:-translate-y-1 relative"
               >
                 <div className="flex items-start justify-between mb-3">

@@ -34,7 +34,7 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
 
     setLoading(true);
     try {
-      const { error } = await signUp(email, password);
+      const { data, error } = await signUp(email, password);
 
       if (error) {
         console.error('Erreur d\'inscription complète:', error);

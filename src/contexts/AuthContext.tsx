@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string) => Promise<{ data: { user: User | null } | null; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Même si pas de session immédiate (confirmation email requise)
       if (!error && data?.user) {
         console.log('Inscription réussie (email peut nécessiter confirmation)');
-        return { error: null };
+        return { data: { user: data.user }, error: null };
       }
       
       if (error) {
@@ -75,10 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
       
-      return { error: error as Error | null };
+      return { data: null, error: error as Error | null };
     } catch (error) {
       console.error('Exception lors de l\'inscription:', error);
-      return { error: error as Error };
+      return { data: null, error: error as Error };
     }
   };
 
