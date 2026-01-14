@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Loader2, ExternalLink, Plus } from 'lucide-react';
+import { useLoadScript } from '@react-google-maps/api';
+import { GOOGLE_MAPS_LIBRARIES } from '../lib/googleMapsConfig';
 
 interface PointOfInterest {
   title: string;
@@ -20,136 +22,87 @@ export function AIActivitySuggestions({ cityName, latitude, longitude, onAddActi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: apiKey || '',
+    libraries: GOOGLE_MAPS_LIBRARIES
+  });
+
+  // Initialiser le service Places
+  useEffect(() => {
+    if (isLoaded && typeof google !== 'undefined' && google.maps && google.maps.places) {
+      const serviceDiv = document.createElement('div');
+      placesServiceRef.current = new google.maps.places.PlacesService(serviceDiv);
+    }
+  }, [isLoaded]);
 
   const fetchAISuggestions = async () => {
     setLoading(true);
     setError('');
     setShowSuggestions(true);
 
+    if (!isLoaded || !placesServiceRef.current) {
+      setError('Google Maps n\'est pas encore chargé. Veuillez réessayer dans quelques instants.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Utiliser l'API Nominatim pour obtenir des informations sur la ville
-      const nominatimResponse = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'TravelU App'
-          }
-        }
-      );
-      
-      const nominatimData = await nominatimResponse.json();
-      const locationInfo = nominatimData.address || {};
-      const fullCityName = locationInfo.city || locationInfo.town || locationInfo.village || cityName;
-      const country = locationInfo.country || '';
-
-      // Utiliser une API de recherche de lieux d'intérêt (Overpass API d'OpenStreetMap)
-      // Chercher des musées, parcs, monuments, etc.
-      const overpassQuery = `
-        [out:json][timeout:25];
-        (
-          node["tourism"="museum"](around:5000,${latitude},${longitude});
-          node["leisure"="park"](around:5000,${latitude},${longitude});
-          node["historic"="monument"](around:5000,${latitude},${longitude});
-          node["amenity"="theatre"](around:5000,${latitude},${longitude});
-          node["tourism"="attraction"](around:5000,${latitude},${longitude});
-        );
-        out body;
-        >;
-        out skel qt;
-      `;
-
-      const overpassResponse = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `data=${encodeURIComponent(overpassQuery)}`,
-      });
-
-      const overpassData = await overpassResponse.json();
-      
-      // Traiter les résultats et créer des suggestions
       const activities: PointOfInterest[] = [];
-      const seenNames = new Set<string>();
+      const seenPlaceIds = new Set<string>();
 
-      if (overpassData.elements) {
-        for (const element of overpassData.elements.slice(0, 10)) {
-          const name = element.tags?.name;
-          if (name && !seenNames.has(name)) {
-            seenNames.add(name);
-            
-            // Créer un lien vers Google Maps avec la clé API
-            const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-            const googleMapsUrl = googleMapsApiKey 
-              ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}+${encodeURIComponent(fullCityName)}&key=${googleMapsApiKey}`
-              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}+${encodeURIComponent(fullCityName)}`;
-            
-            // Déterminer le type d'activité
-            let activityType = 'Lieu d\'intérêt';
-            if (element.tags?.tourism === 'museum') activityType = 'Musée';
-            else if (element.tags?.leisure === 'park') activityType = 'Parc';
-            else if (element.tags?.historic) activityType = 'Monument';
-            else if (element.tags?.amenity === 'theatre') activityType = 'Théâtre';
-            
-            // Extraire les coordonnées depuis les données Overpass
-            const lat = element.lat || (element.geometry?.coordinates?.[1]);
-            const lng = element.lon || (element.geometry?.coordinates?.[0]);
-            
-            activities.push({
-              title: `${activityType}: ${name}`,
-              url: googleMapsUrl,
-              lat: lat || latitude, // Utiliser les coordonnées de l'élément ou celles de la ville
-              lng: lng || longitude
-            });
-
-            if (activities.length >= 5) break;
+      // Utiliser Google Places Nearby Search pour trouver des activités
+      const types = ['museum', 'park', 'tourist_attraction', 'art_gallery', 'zoo', 'aquarium', 'amusement_park', 'stadium', 'shopping_mall', 'restaurant', 'cafe'];
+      
+      // Faire des requêtes pour chaque type
+      const searchPromises = types.slice(0, 5).map((type) => {
+        return new Promise<void>((resolve) => {
+          if (activities.length >= 5) {
+            resolve();
+            return;
           }
-        }
-      }
 
-      // Si on n'a pas assez de résultats, utiliser Google Places API pour obtenir des suggestions avec coordonnées
-      if (activities.length < 5) {
-        try {
-          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-          if (apiKey) {
-            const types = ['museum', 'park', 'tourist_attraction', 'restaurant', 'art_gallery'];
-            for (const type of types) {
-              if (activities.length >= 5) break;
-              
-              const placesResponse = await fetch(
-                `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=5000&type=${type}&key=${apiKey}&language=fr`
-              );
-              const placesData = await placesResponse.json();
-              
-              if (placesData.results && placesData.results.length > 0) {
-                for (const place of placesData.results.slice(0, 2)) {
-                  if (activities.length >= 5) break;
-                  if (!activities.some(a => a.title.includes(place.name))) {
-                    const placeUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}+${encodeURIComponent(fullCityName)}&query_place_id=${place.place_id}`;
-                    activities.push({
-                      title: place.name,
-                      url: placeUrl,
-                      lat: place.geometry.location.lat,
-                      lng: place.geometry.location.lng
-                    });
-                  }
+          const request: google.maps.places.PlaceSearchRequest = {
+            location: new google.maps.LatLng(latitude, longitude),
+            radius: 5000,
+            type: type as google.maps.places.PlaceType,
+            language: 'fr'
+          };
+
+          placesServiceRef.current!.nearbySearch(request, (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+              for (const place of results.slice(0, 2)) {
+                if (activities.length >= 5) break;
+                if (!seenPlaceIds.has(place.place_id!)) {
+                  seenPlaceIds.add(place.place_id!);
+                  const placeUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name || '')}+${encodeURIComponent(cityName)}&query_place_id=${place.place_id}`;
+                  activities.push({
+                    title: place.name || 'Lieu d\'intérêt',
+                    url: placeUrl,
+                    lat: place.geometry?.location?.lat() || latitude,
+                    lng: place.geometry?.location?.lng() || longitude
+                  });
                 }
               }
             }
-          }
-        } catch (err) {
-          console.warn('Erreur lors de la récupération des suggestions Google Places:', err);
-        }
-      }
-      
-      // Si toujours pas assez, ajouter des suggestions génériques (avec coordonnées de la ville)
+            resolve();
+          });
+        });
+      });
+
+      await Promise.all(searchPromises);
+
+      // Si on n'a pas assez de résultats, ajouter des suggestions génériques
       if (activities.length < 5) {
         const genericActivities = [
-          { title: `Visiter ${fullCityName}`, url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullCityName)}`, lat: latitude, lng: longitude },
-          { title: `Musées à ${fullCityName}`, url: `https://www.google.com/maps/search/?api=1&query=musées+${encodeURIComponent(fullCityName)}`, lat: latitude, lng: longitude },
-          { title: `Parcs à ${fullCityName}`, url: `https://www.google.com/maps/search/?api=1&query=parcs+${encodeURIComponent(fullCityName)}`, lat: latitude, lng: longitude },
-          { title: `Monuments à ${fullCityName}`, url: `https://www.google.com/maps/search/?api=1&query=monuments+${encodeURIComponent(fullCityName)}`, lat: latitude, lng: longitude },
-          { title: `Restaurants à ${fullCityName}`, url: `https://www.google.com/maps/search/?api=1&query=restaurants+${encodeURIComponent(fullCityName)}`, lat: latitude, lng: longitude },
+          { title: `Visiter ${cityName}`, url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cityName)}`, lat: latitude, lng: longitude },
+          { title: `Musées à ${cityName}`, url: `https://www.google.com/maps/search/?api=1&query=musées+${encodeURIComponent(cityName)}`, lat: latitude, lng: longitude },
+          { title: `Parcs à ${cityName}`, url: `https://www.google.com/maps/search/?api=1&query=parcs+${encodeURIComponent(cityName)}`, lat: latitude, lng: longitude },
+          { title: `Monuments à ${cityName}`, url: `https://www.google.com/maps/search/?api=1&query=monuments+${encodeURIComponent(cityName)}`, lat: latitude, lng: longitude },
+          { title: `Restaurants à ${cityName}`, url: `https://www.google.com/maps/search/?api=1&query=restaurants+${encodeURIComponent(cityName)}`, lat: latitude, lng: longitude },
         ];
 
         for (const activity of genericActivities) {
