@@ -30,6 +30,42 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
 
   const loadParticipants = async () => {
     setLoading(true);
+    
+    // Essayer d'abord avec la fonction PostgreSQL qui bypass RLS
+    const { data: functionData, error: functionError } = await supabase
+      .rpc('get_trip_participants', { trip_uuid: tripId });
+
+    if (!functionError && functionData) {
+      // Récupérer les emails via la fonction PostgreSQL
+      const participantsWithEmails = await Promise.all(
+        functionData.map(async (participant) => {
+          let userEmail = 'Utilisateur';
+          
+          // Si c'est l'utilisateur actuel, utiliser son email directement
+          if (participant.user_id === user?.id) {
+            userEmail = user.email || 'Utilisateur';
+          } else {
+            // Sinon, utiliser la fonction PostgreSQL pour récupérer l'email
+            const { data: emailData, error: emailError } = await supabase
+              .rpc('get_user_email', { user_uuid: participant.user_id });
+            
+            if (!emailError && emailData) {
+              userEmail = emailData;
+            }
+          }
+          
+          return {
+            ...participant,
+            user_email: userEmail
+          };
+        })
+      );
+      setParticipants(participantsWithEmails);
+      setLoading(false);
+      return;
+    }
+
+    // Si la fonction n'existe pas ou échoue, utiliser la méthode classique
     const { data: participantsData, error } = await supabase
       .from('trip_participants')
       .select('*')
