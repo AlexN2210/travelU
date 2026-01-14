@@ -58,35 +58,26 @@ export function JoinTripPage() {
       if (user && tripId && tripExists) {
         setLoading(true);
         try {
-          // Vérifier si l'utilisateur est déjà participant
-          const { data: existingParticipant } = await supabase
-            .from('trip_participants')
-            .select('id')
-            .eq('trip_id', tripId)
-            .eq('user_id', user.id)
-            .maybeSingle();
+          // Utiliser la fonction PostgreSQL pour s'ajouter au voyage
+          const { data: joinData, error: joinError } = await supabase
+            .rpc('join_trip_via_invite', { trip_uuid: tripId });
 
-          if (existingParticipant) {
-            setError('Vous êtes déjà participant à ce voyage.');
-            setTimeout(() => {
-              navigate('/dashboard');
-            }, 2000);
+          if (joinError) {
+            console.error('Erreur lors de l\'ajout au voyage:', joinError);
+            setError('Erreur lors de l\'ajout au voyage. Veuillez réessayer.');
             setLoading(false);
             return;
           }
 
-          // Ajouter l'utilisateur comme participant
-          const { error: insertError } = await supabase
-            .from('trip_participants')
-            .insert({
-              trip_id: tripId,
-              user_id: user.id,
-              permission: 'read'
-            });
-
-          if (insertError) {
-            console.error('Erreur lors de l\'ajout au voyage:', insertError);
-            setError('Erreur lors de l\'ajout au voyage. Veuillez réessayer.');
+          if (joinData && !joinData.success) {
+            if (joinData.error === 'Vous êtes déjà participant à ce voyage') {
+              setError('Vous êtes déjà participant à ce voyage.');
+            } else {
+              setError(joinData.error || 'Erreur lors de l\'ajout au voyage.');
+            }
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 2000);
             setLoading(false);
             return;
           }
@@ -146,19 +137,19 @@ export function JoinTripPage() {
 
       // Attendre que l'utilisateur soit créé et connecté
       if (signUpData?.user && tripId) {
-        // Ajouter l'utilisateur comme participant au voyage
-        const { error: insertError } = await supabase
-          .from('trip_participants')
-          .insert({
-            trip_id: tripId,
-            user_id: signUpData.user.id,
-            permission: 'read'
-          });
+        // Attendre un peu pour que la session soit bien établie
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Utiliser la fonction PostgreSQL pour s'ajouter au voyage
+        const { data: joinData, error: joinError } = await supabase
+          .rpc('join_trip_via_invite', { trip_uuid: tripId });
 
-        if (insertError) {
-          console.error('Erreur lors de l\'ajout au voyage:', insertError);
-          // L'utilisateur est créé mais pas ajouté au voyage - il peut le faire manuellement
+        if (joinError) {
+          console.error('Erreur lors de l\'ajout au voyage:', joinError);
           setError('Compte créé avec succès, mais erreur lors de l\'ajout au voyage. Vous pouvez accéder au voyage depuis votre tableau de bord.');
+        } else if (joinData && !joinData.success) {
+          console.error('Erreur lors de l\'ajout au voyage:', joinData.error);
+          setError(`Compte créé avec succès, mais ${joinData.error || 'erreur lors de l\'ajout au voyage'}. Vous pouvez accéder au voyage depuis votre tableau de bord.`);
         } else {
           setSuccess(true);
           setTimeout(() => {
