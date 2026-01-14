@@ -363,18 +363,18 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
 
     // Si une étape existe déjà, on la met à jour au lieu d'en créer une nouvelle
     if (existingStage) {
-      const { error: updateError } = await supabase
-        .from('stages')
-        .update({
-          name: name.trim(),
-          latitude: selectedDestination?.lat || existingStage.latitude,
-          longitude: selectedDestination?.lon || existingStage.longitude,
-          accommodation_link: accommodationLink || null,
-          transport_to_next: transportToNext || null,
-          notes: notes || null,
-          points_of_interest: pointsOfInterest.length > 0 ? pointsOfInterest : null
-        })
-        .eq('id', existingStage.id);
+      // Utiliser la fonction PostgreSQL pour éviter la récursion RLS
+      const { data: updateData, error: updateError } = await supabase
+        .rpc('update_stage', {
+          p_stage_id: existingStage.id,
+          p_name: name.trim(),
+          p_latitude: selectedDestination?.lat || existingStage.latitude,
+          p_longitude: selectedDestination?.lon || existingStage.longitude,
+          p_accommodation_link: accommodationLink || null,
+          p_transport_to_next: transportToNext || null,
+          p_notes: notes || null,
+          p_points_of_interest: pointsOfInterest.length > 0 ? pointsOfInterest : null
+        });
 
       if (updateError) {
         console.error('Erreur lors de la mise à jour de l\'étape:', updateError);
@@ -390,18 +390,18 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
         return;
       }
 
-      const { error: insertError } = await supabase
-        .from('stages')
-        .insert({
-          trip_id: tripId,
-          name: name.trim(),
-          order_index: orderIndex,
-          latitude: selectedDestination.lat,
-          longitude: selectedDestination.lon,
-          accommodation_link: accommodationLink || null,
-          transport_to_next: transportToNext || null,
-          notes: notes || null,
-          points_of_interest: pointsOfInterest.length > 0 ? pointsOfInterest : null
+      // Utiliser la fonction PostgreSQL pour éviter la récursion RLS
+      const { data: createData, error: insertError } = await supabase
+        .rpc('create_stage', {
+          p_trip_id: tripId,
+          p_name: name.trim(),
+          p_order_index: orderIndex,
+          p_latitude: selectedDestination.lat,
+          p_longitude: selectedDestination.lon,
+          p_accommodation_link: accommodationLink || null,
+          p_transport_to_next: transportToNext || null,
+          p_notes: notes || null,
+          p_points_of_interest: pointsOfInterest.length > 0 ? pointsOfInterest : null
         });
 
       if (insertError) {
