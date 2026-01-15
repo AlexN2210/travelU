@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, ThumbsUp, ThumbsDown, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { VotePlacesAutocomplete } from '../VotePlacesAutocomplete';
 
 interface VoteCategory {
   id: string;
@@ -53,6 +54,17 @@ function VoteOptionImage({ src, alt }: { src: string; alt: string }) {
       )}
     </div>
   );
+}
+
+function getPlatformLabel(url: string) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.includes('booking.')) return 'Voir sur Booking';
+    if (host.includes('airbnb.')) return 'Voir sur Airbnb';
+    return 'Voir le lien';
+  } catch {
+    return 'Voir le lien';
+  }
 }
 
 export function VotingTab({ tripId }: VotingTabProps) {
@@ -403,7 +415,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
                     className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1 mb-4"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    <span>Voir le lien</span>
+                    <span>{getPlatformLabel(currentSwipeOption.link)}</span>
                   </a>
                 )}
 
@@ -464,7 +476,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
                     className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1 mb-4"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    <span>Voir le lien</span>
+                    <span>{getPlatformLabel(option.link)}</span>
                   </a>
                 )}
 
@@ -510,6 +522,8 @@ export function VotingTab({ tripId }: VotingTabProps) {
       {showAddOption && selectedCategory && (
         <AddOptionModal
           categoryId={selectedCategory}
+          categoryName={categories.find(c => c.id === selectedCategory)?.name}
+          categoryTitle={categories.find(c => c.id === selectedCategory)?.title}
           onClose={() => setShowAddOption(false)}
           onSuccess={() => {
             setShowAddOption(false);
@@ -525,12 +539,63 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
 interface AddOptionModalProps {
   categoryId: string;
+  categoryName?: string;
+  categoryTitle?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps) {
+function getCategoryCopy(categoryName?: string, categoryTitle?: string) {
+  const name = (categoryName || '').toLowerCase();
+  const title = categoryTitle || 'option';
+
+  switch (name) {
+    case 'accommodation':
+      return {
+        modalTitle: `Ajouter un hébergement`,
+        titleLabel: `Nom de l'hébergement *`,
+        titlePlaceholder: `Ex: Hôtel Marriott / Riad / Appartement...`,
+        descLabel: `Description (optionnel)`,
+        descPlaceholder: `Quartier, distance, avis, conditions...`,
+        linkLabel: `Lien (optionnel)`,
+        linkPlaceholder: `Lien Booking/Airbnb... (https://...)`
+      };
+    case 'restaurant':
+      return {
+        modalTitle: `Ajouter un restaurant`,
+        titleLabel: `Nom du restaurant *`,
+        titlePlaceholder: `Ex: Le Petit Bistro`,
+        descLabel: `Description (optionnel)`,
+        descPlaceholder: `Type de cuisine, budget, pourquoi c’est bien...`,
+        linkLabel: `Lien (optionnel)`,
+        linkPlaceholder: `Lien Google Maps / site du restaurant... (https://...)`
+      };
+    case 'activity':
+      return {
+        modalTitle: `Ajouter une activité`,
+        titleLabel: `Nom de l’activité *`,
+        titlePlaceholder: `Ex: Visite du musée, excursion, surf...`,
+        descLabel: `Description (optionnel)`,
+        descPlaceholder: `Durée, prix, horaires, infos utiles...`,
+        linkLabel: `Lien (optionnel)`,
+        linkPlaceholder: `Lien billet / Google Maps / site... (https://...)`
+      };
+    default:
+      return {
+        modalTitle: `Ajouter une option (${title})`,
+        titleLabel: `Titre *`,
+        titlePlaceholder: `Ex: Idée à proposer`,
+        descLabel: `Description (optionnel)`,
+        descPlaceholder: `Ajoute des détails pour aider le groupe à décider...`,
+        linkLabel: `Lien (optionnel)`,
+        linkPlaceholder: `https://...`
+      };
+  }
+}
+
+function AddOptionModal({ categoryId, categoryName, categoryTitle, onClose, onSuccess }: AddOptionModalProps) {
   const { user } = useAuth();
+  const copy = getCategoryCopy(categoryName, categoryTitle);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [link, setLink] = useState('');
@@ -630,13 +695,44 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
     >
       <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Ajouter une option
+          {copy.modalTitle}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
               {error}
+            </div>
+          )}
+
+          {(categoryName === 'restaurant' || categoryName === 'activity') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {categoryName === 'restaurant'
+                  ? 'Trouver via Google Places (restaurant/bar/café)'
+                  : 'Trouver via Google Places (activité)'}
+              </label>
+              <VotePlacesAutocomplete
+                mode={categoryName === 'restaurant' ? 'restaurant' : 'activity'}
+                placeholder={
+                  categoryName === 'restaurant'
+                    ? 'Rechercher un restaurant, bar ou café...'
+                    : 'Rechercher une activité (musée, parc, attraction...)...'
+                }
+                onSelect={(p) => {
+                  // auto-remplir
+                  if (!title) setTitle(p.name);
+                  if (!description) setDescription(p.address);
+                  setLink(p.url);
+                  if (p.imageUrl) {
+                    setImagePreviewError(false);
+                    setImageUrl(p.imageUrl);
+                  }
+                }}
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                Astuce: sélectionne un résultat pour remplir automatiquement Titre + Lien Google Maps (et photo si disponible).
+              </p>
             </div>
           )}
 
@@ -648,7 +744,7 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Titre *
+              {copy.titleLabel}
             </label>
             <input
               type="text"
@@ -656,33 +752,33 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
               onChange={(e) => setTitle(e.target.value)}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Ex: Hôtel Marriott"
+              placeholder={copy.titlePlaceholder}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description (optionnel)
+              {copy.descLabel}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Décrivez l'option..."
+              placeholder={copy.descPlaceholder}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Lien (optionnel)
+              {copy.linkLabel}
             </label>
             <input
               type="url"
               value={link}
               onChange={(e) => setLink(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="https://..."
+              placeholder={copy.linkPlaceholder}
             />
             <div className="mt-2 flex justify-end">
               <button
