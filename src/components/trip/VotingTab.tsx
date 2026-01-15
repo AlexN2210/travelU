@@ -67,14 +67,41 @@ export function VotingTab({ tripId }: VotingTabProps) {
     setSwipeIndex(0);
   }, [selectedCategory, options.length]);
 
+  const createDefaultCategoriesFallback = async () => {
+    const defaultCategories = [
+      { name: 'accommodation', title: 'Hébergements' },
+      { name: 'activity', title: 'Activités' },
+      { name: 'restaurant', title: 'Restaurants' },
+      { name: 'other', title: 'Autres' }
+    ];
+
+    const { error } = await supabase.from('vote_categories').insert(
+      defaultCategories.map((cat) => ({
+        trip_id: tripId,
+        name: cat.name,
+        title: cat.title
+      }))
+    );
+
+    if (error) {
+      // Si l'utilisateur est lecteur, l'insert peut être refusé par RLS. On ignore ici.
+      console.warn('Impossible de créer les catégories par défaut (fallback):', error);
+    }
+  };
+
   const loadCategories = async () => {
     setLoading(true);
+    // 1) Tentative via RPC (recommandé)
     const { data, error } = await supabase.rpc('get_trip_vote_categories', { p_trip_id: tripId });
 
     if (!error && data && Array.isArray(data)) {
       if (data.length === 0) {
-        // Crée les catégories par défaut (créateur/éditeur uniquement)
-        await supabase.rpc('ensure_default_vote_categories', { p_trip_id: tripId });
+        // Crée les catégories par défaut (créateur/éditeur uniquement) via RPC
+        const { error: ensureErr } = await supabase.rpc('ensure_default_vote_categories', { p_trip_id: tripId });
+        if (ensureErr) {
+          // Fallback (si RPC non déployé)
+          await createDefaultCategoriesFallback();
+        }
         const { data: data2 } = await supabase.rpc('get_trip_vote_categories', { p_trip_id: tripId });
         if (data2 && Array.isArray(data2)) {
           setCategories(data2);
@@ -84,34 +111,114 @@ export function VotingTab({ tripId }: VotingTabProps) {
         setCategories(data);
         if (!selectedCategory) setSelectedCategory(data[0].id);
       }
-    } else if (error) {
-      console.error('Erreur chargement catégories vote:', error);
+      setLoading(false);
+      return;
     }
+
+    // 2) Fallback si RPC non déployé (404 / function not found / etc.)
+    if (error) {
+      console.error('Erreur chargement catégories vote (RPC):', error);
+    }
+
+    const { data: cats, error: catsErr } = await supabase
+      .from('vote_categories')
+      .select('*')
+      .eq('trip_id', tripId)
+      .order('created_at', { ascending: true });
+
+    if (catsErr) {
+      console.error('Erreur chargement catégories vote (fallback):', catsErr);
+      setLoading(false);
+      return;
+    }
+
+    if (!cats || cats.length === 0) {
+      await createDefaultCategoriesFallback();
+      const { data: cats2 } = await supabase
+        .from('vote_categories')
+        .select('*')
+        .eq('trip_id', tripId)
+        .order('created_at', { ascending: true });
+      if (cats2) {
+        setCategories(cats2);
+        if (cats2.length > 0) setSelectedCategory(cats2[0].id);
+      }
+    } else {
+      setCategories(cats);
+      if (!selectedCategory) setSelectedCategory(cats[0].id);
+    }
+
     setLoading(false);
   };
 
   const loadOptions = async (categoryId: string) => {
+    // 1) Tentative via RPC (anti N+1)
     const { data, error } = await supabase.rpc('get_vote_options_with_counts', { p_category_id: categoryId });
     if (!error && data && Array.isArray(data)) {
-      // user_vote peut être null -> conserver userVote: null
       setOptions(
         data.map((o: any) => ({
           ...o,
           userVote: o.user_vote ?? null
         }))
       );
-    } else if (error) {
-      console.error('Erreur chargement options vote:', error);
+      return;
     }
+
+    if (error) {
+      console.error('Erreur chargement options vote (RPC):', error);
+    }
+
+    // 2) Fallback: chargement direct + calcul votes (plus lent)
+    const { data: optionsData, error: optionsErr } = await supabase
+      .from('vote_options')
+      .select('*')
+      .eq('category_id', categoryId)
+      .order('created_at', { ascending: false });
+
+    if (optionsErr || !optionsData) {
+      console.error('Erreur chargement options vote (fallback):', optionsErr);
+      return;
+    }
+
+    const optionsWithVotes = await Promise.all(
+      optionsData.map(async (option: any) => {
+        const { data: votes } = await supabase
+          .from('user_votes')
+          .select('vote, user_id')
+          .eq('option_id', option.id);
+
+        const upvotes = votes?.filter(v => v.vote === true).length || 0;
+        const downvotes = votes?.filter(v => v.vote === false).length || 0;
+        const userVote = votes?.find(v => v.user_id === user?.id)?.vote ?? null;
+
+        return {
+          ...option,
+          upvotes,
+          downvotes,
+          userVote
+        };
+      })
+    );
+    setOptions(optionsWithVotes);
   };
 
   const handleVote = async (optionId: string, vote: boolean) => {
     const existingVote = options.find(o => o.id === optionId)?.userVote;
 
     if (existingVote === vote) {
-      await supabase.rpc('remove_vote', { p_option_id: optionId });
+      const { error } = await supabase.rpc('remove_vote', { p_option_id: optionId });
+      if (error) {
+        // fallback direct
+        await supabase.from('user_votes').delete().eq('option_id', optionId).eq('user_id', user!.id);
+      }
     } else {
-      await supabase.rpc('cast_vote', { p_option_id: optionId, p_vote: vote });
+      const { error } = await supabase.rpc('cast_vote', { p_option_id: optionId, p_vote: vote });
+      if (error) {
+        // fallback direct
+        await supabase
+          .from('user_votes')
+          .upsert({ option_id: optionId, user_id: user!.id, vote }, { onConflict: 'option_id,user_id' });
+      }
     }
 
     if (selectedCategory) {
@@ -390,6 +497,7 @@ interface AddOptionModalProps {
 }
 
 function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps) {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [link, setLink] = useState('');
@@ -409,10 +517,22 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
     });
 
     if (insertError) {
-      console.error('Erreur ajout option vote:', insertError);
-      setError(insertError.message || 'Erreur lors de l\'ajout de l\'option');
-      setLoading(false);
-      return;
+      console.error('Erreur ajout option vote (RPC):', insertError);
+      // fallback si RPC non déployé
+      const { error: fallbackErr } = await supabase.from('vote_options').insert({
+        category_id: categoryId,
+        title,
+        description: description || null,
+        link: link || null,
+        added_by: user!.id
+      });
+
+      if (fallbackErr) {
+        console.error('Erreur ajout option vote (fallback):', fallbackErr);
+        setError(fallbackErr.message || insertError.message || 'Erreur lors de l\'ajout de l\'option');
+        setLoading(false);
+        return;
+      }
     }
 
     setLoading(false);
