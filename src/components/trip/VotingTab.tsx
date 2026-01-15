@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, ThumbsUp, ThumbsDown, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -94,6 +94,11 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
   // Swipe gesture state
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const [cardEl, setCardEl] = useState<HTMLDivElement | null>(null);
+  const setCardRefs = useCallback((node: HTMLDivElement | null) => {
+    cardRef.current = node;
+    setCardEl(node);
+  }, []);
   const commitSwipeRef = useRef<(direction: 'left' | 'right') => Promise<void>>(async () => {});
 
   useEffect(() => {
@@ -337,7 +342,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
   // IMPORTANT: ce hook doit être APRES la définition de commitSwipe (sinon TDZ -> "Cannot access before initialization")
   useEffect(() => {
     if (!isCoarsePointer) return;
-    const el = cardRef.current;
+    const el = cardEl;
     if (!el) return;
 
     let active = false;
@@ -405,7 +410,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
       el.removeEventListener('touchend', onTouchEnd);
       el.removeEventListener('touchcancel', onTouchCancel);
     };
-  }, [isCoarsePointer]);
+  }, [isCoarsePointer, cardEl]);
 
   if (loading) {
     return (
@@ -474,7 +479,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
           {currentSwipeOption ? (
             <div className="relative max-w-md mx-auto">
               <div
-                ref={cardRef}
+                ref={setCardRefs}
                 className="bg-white rounded-2xl shadow-medium overflow-hidden select-none"
                 style={{ touchAction: 'pan-y' }}
               >
