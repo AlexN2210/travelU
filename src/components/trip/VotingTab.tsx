@@ -102,6 +102,79 @@ export function VotingTab({ tripId }: VotingTabProps) {
     dy: 0
   });
 
+  // Swipe mobile: listeners natifs (React peut rendre touchmove "passif" => preventDefault ignoré)
+  useEffect(() => {
+    if (!isCoarsePointer) return;
+    const el = cardRef.current;
+    if (!el) return;
+
+    let active = false;
+    let startX = 0;
+    let startY = 0;
+    let dx = 0;
+    let dy = 0;
+
+    const threshold = 80;
+
+    const onTouchStart = (ev: TouchEvent) => {
+      if (!ev.touches || ev.touches.length !== 1) return;
+      active = true;
+      const t = ev.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      dx = 0;
+      dy = 0;
+      setSwipeDx(0);
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      if (!active || !ev.touches || ev.touches.length !== 1) return;
+      const t = ev.touches[0];
+      dx = t.clientX - startX;
+      dy = t.clientY - startY;
+
+      // Geste horizontal => on prend la main (sinon on laisse le scroll vertical)
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+        ev.preventDefault();
+        setSwipeDx(dx);
+        applyCardTransform(dx);
+      }
+    };
+
+    const finish = async () => {
+      if (!active) return;
+      active = false;
+      if (dx > threshold) {
+        await commitSwipe('right');
+      } else if (dx < -threshold) {
+        await commitSwipe('left');
+      } else {
+        resetCardTransform();
+      }
+    };
+
+    const onTouchEnd = () => {
+      void finish();
+    };
+
+    const onTouchCancel = () => {
+      active = false;
+      resetCardTransform();
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', onTouchCancel, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchCancel);
+    };
+  }, [isCoarsePointer, commitSwipe]);
+
   useEffect(() => {
     loadCategories();
   }, [tripId]);
@@ -405,81 +478,6 @@ export function VotingTab({ tripId }: VotingTabProps) {
                 ref={cardRef}
                 className="bg-white rounded-2xl shadow-medium overflow-hidden select-none"
                 style={{ touchAction: 'pan-y' }}
-                onPointerDown={(e) => {
-                  // uniquement touch/coarse
-                  dragRef.current.active = true;
-                  dragRef.current.startX = e.clientX;
-                  dragRef.current.startY = e.clientY;
-                  dragRef.current.dx = 0;
-                  dragRef.current.dy = 0;
-                  setSwipeDx(0);
-                  (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
-                }}
-                onPointerMove={(e) => {
-                  if (!dragRef.current.active) return;
-                  const dx = e.clientX - dragRef.current.startX;
-                  const dy = e.clientY - dragRef.current.startY;
-                  dragRef.current.dx = dx;
-                  dragRef.current.dy = dy;
-                  // si l'utilisateur scrolle verticalement, ne pas bloquer
-                  if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) return;
-                  setSwipeDx(dx);
-                  applyCardTransform(dx);
-                }}
-                onPointerUp={async () => {
-                  if (!dragRef.current.active) return;
-                  dragRef.current.active = false;
-                  const { dx } = dragRef.current;
-                  const threshold = 90;
-                  if (dx > threshold) {
-                    await commitSwipe('right');
-                  } else if (dx < -threshold) {
-                    await commitSwipe('left');
-                  } else {
-                    resetCardTransform();
-                  }
-                }}
-                onPointerCancel={() => {
-                  dragRef.current.active = false;
-                  resetCardTransform();
-                }}
-                onTouchStart={(e) => {
-                  if (!e.touches || e.touches.length !== 1) return;
-                  const t = e.touches[0];
-                  dragRef.current.active = true;
-                  dragRef.current.startX = t.clientX;
-                  dragRef.current.startY = t.clientY;
-                  dragRef.current.dx = 0;
-                  dragRef.current.dy = 0;
-                  setSwipeDx(0);
-                }}
-                onTouchMove={(e) => {
-                  if (!dragRef.current.active || !e.touches || e.touches.length !== 1) return;
-                  const t = e.touches[0];
-                  const dx = t.clientX - dragRef.current.startX;
-                  const dy = t.clientY - dragRef.current.startY;
-                  dragRef.current.dx = dx;
-                  dragRef.current.dy = dy;
-                  // Si geste horizontal, on évite que le scroll prenne le dessus (iOS)
-                  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
-                    e.preventDefault();
-                    setSwipeDx(dx);
-                    applyCardTransform(dx);
-                  }
-                }}
-                onTouchEnd={async () => {
-                  if (!dragRef.current.active) return;
-                  dragRef.current.active = false;
-                  const { dx } = dragRef.current;
-                  const threshold = 90;
-                  if (dx > threshold) {
-                    await commitSwipe('right');
-                  } else if (dx < -threshold) {
-                    await commitSwipe('left');
-                  } else {
-                    resetCardTransform();
-                  }
-                }}
               >
                 {/* Overlays swipe */}
                 <div className="absolute top-4 left-4 z-10 pointer-events-none">

@@ -215,9 +215,11 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Soldes</h3>
           <div className="space-y-3">
             {balances.map((balance) => (
-              <div key={balance.userId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span className="font-medium text-gray-900">{balance.userLabel}</span>
-                <span className={`font-bold ${
+              <div key={balance.userId} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg min-w-0">
+                <span className="font-medium text-gray-900 min-w-0 flex-1 truncate">
+                  {balance.userLabel}
+                </span>
+                <span className={`font-bold tabular-nums whitespace-nowrap text-right shrink-0 ${
                   balance.balance > 0 ? 'text-green-600' : balance.balance < 0 ? 'text-red-600' : 'text-gray-600'
                 }`}>
                   {balance.balance > 0 ? '+' : ''}{balance.balance.toFixed(2)} €
@@ -248,10 +250,10 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
         <div className="bg-white rounded-xl shadow-sm divide-y">
           {expenses.map((expense) => (
             <div key={expense.id} className="p-6">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-2 min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 break-words min-w-0">
                       {expense.description}
                     </h3>
                     <span className={`px-3 py-1 text-xs font-heading font-semibold rounded-full ${
@@ -260,16 +262,18 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
                       {EXPENSE_CATEGORY_UI[expense.category]?.label || expense.category}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-4 text-sm text-gray-600">
-                    <span>Payé par: {expense.payer_email}</span>
-                    <span>•</span>
-                    <span>Partagé entre {expense.split_between.length} personne{expense.split_between.length > 1 ? 's' : ''}</span>
-                    <span>•</span>
-                    <span>{new Date(expense.created_at).toLocaleDateString('fr-FR')}</span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+                    <span className="break-words min-w-0">Payé par: {expense.payer_email}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="whitespace-nowrap">
+                      Partagé entre {expense.split_between.length} personne{expense.split_between.length > 1 ? 's' : ''}
+                    </span>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="whitespace-nowrap">{new Date(expense.created_at).toLocaleDateString('fr-FR')}</span>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <span className="text-2xl font-bold text-gray-900">
+                <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+                  <span className="text-2xl font-bold text-gray-900 tabular-nums whitespace-nowrap">
                     {expense.amount.toFixed(2)} €
                   </span>
                   {expense.paid_by === user?.id && (
