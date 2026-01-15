@@ -536,8 +536,43 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
   const [link, setLink] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imagePreviewError, setImagePreviewError] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const fetchPreview = async () => {
+    setPreviewError('');
+    if (!link || !/^https?:\/\//i.test(link)) {
+      setPreviewError('Ajoute un lien valide (https://...) pour générer un aperçu.');
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      const resp = await fetch(`/api/link-preview?url=${encodeURIComponent(link)}`);
+      const data = await resp.json();
+
+      if (data?.error) {
+        setPreviewError(`Aperçu indisponible: ${data.error}`);
+      } else {
+        // On ne remplace pas si l'utilisateur a déjà rempli
+        if (!title && data.title) setTitle(data.title);
+        if (!description && data.description) setDescription(data.description);
+        if (!imageUrl && data.image) {
+          setImagePreviewError(false);
+          setImageUrl(data.image);
+        }
+        if (!data.image && !data.description && !data.title) {
+          setPreviewError('Aucune métadonnée trouvée pour ce lien.');
+        }
+      }
+    } catch (e: any) {
+      setPreviewError(e?.message || 'Erreur lors de la génération de l’aperçu.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -605,6 +640,12 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
             </div>
           )}
 
+          {previewError && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-800 text-sm">
+              {previewError}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Titre *
@@ -643,6 +684,16 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="https://..."
             />
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={fetchPreview}
+                disabled={previewLoading}
+                className="px-3 py-2 text-sm bg-turquoise text-white rounded-button hover:bg-turquoise/90 disabled:opacity-50"
+              >
+                {previewLoading ? 'Aperçu...' : 'Générer aperçu (image + description)'}
+              </button>
+            </div>
           </div>
 
           <div>
