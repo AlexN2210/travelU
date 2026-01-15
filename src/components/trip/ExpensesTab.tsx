@@ -29,12 +29,11 @@ type ParticipantProfile = {
   last_name: string | null;
 };
 
-function formatParticipantLabel(p: ParticipantProfile) {
-  const name = `${p.first_name || ''} ${p.last_name || ''}`.trim();
-  if (name && p.email) return `${name} (${p.email})`;
-  if (name) return name;
-  if (p.email) return p.email;
-  return 'Utilisateur';
+function formatParticipantLabel(p: ParticipantProfile, currentUserId?: string) {
+  if (currentUserId && p.user_id === currentUserId) return 'Moi';
+  // Afficher uniquement le prénom (demande utilisateur). Fallback si manquant.
+  if (p.first_name && p.first_name.trim()) return p.first_name.trim();
+  return 'Participant';
 }
 
 interface ExpensesTabProps {
@@ -78,13 +77,13 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
     if (!error && expensesData) {
       // map user_id -> label
       const labelById = new Map<string, string>();
-      participants.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p)));
-      if (user?.id && user.email) labelById.set(user.id, user.email);
+      participants.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p, user?.id)));
+      if (user?.id) labelById.set(user.id, 'Moi');
 
       const expensesWithEmails = expensesData.map((expense) => {
         return {
           ...expense,
-          payer_email: labelById.get(expense.paid_by) || (expense.paid_by === user?.id ? user.email : 'Utilisateur')
+          payer_email: labelById.get(expense.paid_by) || (expense.paid_by === user?.id ? 'Moi' : 'Participant')
         };
       });
       setExpenses(expensesWithEmails);
@@ -110,13 +109,13 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
     }
 
     const labelById = new Map<string, string>();
-    participants.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p)));
-    if (user?.id && user.email) labelById.set(user.id, user.email);
+    participants.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p, user?.id)));
+    if (user?.id) labelById.set(user.id, 'Moi');
 
     const balancesWithEmails = Array.from(balanceMap.entries()).map(([userId, balance]) => {
       return {
         userId,
-        userLabel: labelById.get(userId) || (userId === user?.id ? user.email : 'Utilisateur'),
+        userLabel: labelById.get(userId) || (userId === user?.id ? 'Moi' : 'Participant'),
         balance
       };
     });
@@ -443,7 +442,7 @@ function AddExpenseModal({ tripId, participants, onClose, onSuccess }: AddExpens
                     onChange={() => toggleParticipant(participant.user_id)}
                     className="w-4 h-4 text-blue-600"
                   />
-                  <span className="text-sm text-gray-900">{formatParticipantLabel(participant)}</span>
+                  <span className="text-sm text-gray-900">{formatParticipantLabel(participant, user?.id)}</span>
                 </label>
               ))}
             </div>
