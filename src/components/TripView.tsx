@@ -6,6 +6,7 @@ import { ParticipantsTab } from './trip/ParticipantsTab';
 import { VotingTab } from './trip/VotingTab';
 import { ExpensesTab } from './trip/ExpensesTab';
 import { ChecklistTab } from './trip/ChecklistTab';
+import { TripNotifications } from './TripNotifications';
 
 interface TripViewProps {
   tripId: string;
@@ -98,6 +99,7 @@ export function TripView({ tripId, onBack }: TripViewProps) {
 
   return (
     <div className="min-h-screen bg-cream font-body">
+      <TripNotifications tripId={tripId} />
       <div className="bg-white shadow-soft w-full overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 w-full">
           <button

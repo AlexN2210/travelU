@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, ThumbsUp, ThumbsDown, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,6 +35,22 @@ export function VotingTab({ tripId }: VotingTabProps) {
   const [options, setOptions] = useState<VoteOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddOption, setShowAddOption] = useState(false);
+  const [swipeIndex, setSwipeIndex] = useState(0);
+
+  const isCoarsePointer = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia?.('(pointer: coarse)')?.matches || window.innerWidth < 768;
+  }, []);
+
+  // Swipe gesture state
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef({
+    active: false,
+    startX: 0,
+    startY: 0,
+    dx: 0,
+    dy: 0
+  });
 
   useEffect(() => {
     loadCategories();
@@ -46,74 +62,46 @@ export function VotingTab({ tripId }: VotingTabProps) {
     }
   }, [selectedCategory]);
 
+  // Reset swipe position when options/category change
+  useEffect(() => {
+    setSwipeIndex(0);
+  }, [selectedCategory, options.length]);
+
   const loadCategories = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('vote_categories')
-      .select('*')
-      .eq('trip_id', tripId)
-      .order('created_at', { ascending: true });
+    const { data, error } = await supabase.rpc('get_trip_vote_categories', { p_trip_id: tripId });
 
     if (!error && data && Array.isArray(data)) {
-      setCategories(data);
-      if (data.length > 0 && !selectedCategory) {
-        setSelectedCategory(data[0].id);
-      } else if (data.length === 0) {
-        await createDefaultCategories();
-        loadCategories();
+      if (data.length === 0) {
+        // Crée les catégories par défaut (créateur/éditeur uniquement)
+        await supabase.rpc('ensure_default_vote_categories', { p_trip_id: tripId });
+        const { data: data2 } = await supabase.rpc('get_trip_vote_categories', { p_trip_id: tripId });
+        if (data2 && Array.isArray(data2)) {
+          setCategories(data2);
+          if (data2.length > 0) setSelectedCategory(data2[0].id);
+        }
+      } else {
+        setCategories(data);
+        if (!selectedCategory) setSelectedCategory(data[0].id);
       }
-    } else if (!error && (!data || (Array.isArray(data) && data.length === 0))) {
-      await createDefaultCategories();
-      loadCategories();
+    } else if (error) {
+      console.error('Erreur chargement catégories vote:', error);
     }
     setLoading(false);
   };
 
-  const createDefaultCategories = async () => {
-    const defaultCategories = [
-      { name: 'accommodation', title: 'Hébergements' },
-      { name: 'activity', title: 'Activités' },
-      { name: 'restaurant', title: 'Restaurants' },
-      { name: 'other', title: 'Autres' }
-    ];
-
-    await supabase.from('vote_categories').insert(
-      defaultCategories.map(cat => ({
-        trip_id: tripId,
-        name: cat.name,
-        title: cat.title
-      }))
-    );
-  };
-
   const loadOptions = async (categoryId: string) => {
-    const { data: optionsData, error } = await supabase
-      .from('vote_options')
-      .select('*')
-      .eq('category_id', categoryId)
-      .order('created_at', { ascending: false });
-
-    if (!error && optionsData) {
-      const optionsWithVotes = await Promise.all(
-        optionsData.map(async (option) => {
-          const { data: votes } = await supabase
-            .from('user_votes')
-            .select('vote, user_id')
-            .eq('option_id', option.id);
-
-          const upvotes = votes?.filter(v => v.vote === true).length || 0;
-          const downvotes = votes?.filter(v => v.vote === false).length || 0;
-          const userVote = votes?.find(v => v.user_id === user?.id)?.vote ?? null;
-
-          return {
-            ...option,
-            upvotes,
-            downvotes,
-            userVote
-          };
-        })
+    const { data, error } = await supabase.rpc('get_vote_options_with_counts', { p_category_id: categoryId });
+    if (!error && data && Array.isArray(data)) {
+      // user_vote peut être null -> conserver userVote: null
+      setOptions(
+        data.map((o: any) => ({
+          ...o,
+          userVote: o.user_vote ?? null
+        }))
       );
-      setOptions(optionsWithVotes);
+    } else if (error) {
+      console.error('Erreur chargement options vote:', error);
     }
   };
 
@@ -121,24 +109,39 @@ export function VotingTab({ tripId }: VotingTabProps) {
     const existingVote = options.find(o => o.id === optionId)?.userVote;
 
     if (existingVote === vote) {
-      await supabase
-        .from('user_votes')
-        .delete()
-        .eq('option_id', optionId)
-        .eq('user_id', user!.id);
+      await supabase.rpc('remove_vote', { p_option_id: optionId });
     } else {
-      await supabase
-        .from('user_votes')
-        .upsert({
-          option_id: optionId,
-          user_id: user!.id,
-          vote
-        }, { onConflict: 'option_id,user_id' });
+      await supabase.rpc('cast_vote', { p_option_id: optionId, p_vote: vote });
     }
 
     if (selectedCategory) {
       loadOptions(selectedCategory);
     }
+  };
+
+  const applyCardTransform = (dx: number) => {
+    const el = cardRef.current;
+    if (!el) return;
+    const rotate = Math.max(-12, Math.min(12, dx / 20));
+    el.style.transform = `translateX(${dx}px) rotate(${rotate}deg)`;
+  };
+
+  const resetCardTransform = () => {
+    const el = cardRef.current;
+    if (!el) return;
+    el.style.transition = 'transform 150ms ease-out';
+    el.style.transform = 'translateX(0px) rotate(0deg)';
+    window.setTimeout(() => {
+      if (el) el.style.transition = '';
+    }, 160);
+  };
+
+  const commitSwipe = async (direction: 'left' | 'right') => {
+    const current = options[swipeIndex];
+    if (!current) return;
+    await handleVote(current.id, direction === 'right');
+    setSwipeIndex((i) => Math.min(i + 1, Math.max(0, options.length - 1)));
+    resetCardTransform();
   };
 
   if (loading) {
@@ -148,6 +151,8 @@ export function VotingTab({ tripId }: VotingTabProps) {
       </div>
     );
   }
+
+  const currentSwipeOption = options[swipeIndex];
 
   return (
     <div className="space-y-6">
@@ -194,6 +199,106 @@ export function VotingTab({ tripId }: VotingTabProps) {
           >
             Ajouter une option
           </button>
+        </div>
+      ) : isCoarsePointer ? (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <p className="text-sm text-gray-600">
+              Swipe à droite = <span className="font-semibold">Oui</span>, swipe à gauche = <span className="font-semibold">Non</span>
+            </p>
+          </div>
+
+          {currentSwipeOption ? (
+            <div className="relative">
+              <div
+                ref={cardRef}
+                className="bg-white rounded-lg shadow-sm p-6 touch-none select-none"
+                onPointerDown={(e) => {
+                  // uniquement touch/coarse
+                  dragRef.current.active = true;
+                  dragRef.current.startX = e.clientX;
+                  dragRef.current.startY = e.clientY;
+                  dragRef.current.dx = 0;
+                  dragRef.current.dy = 0;
+                  (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  if (!dragRef.current.active) return;
+                  const dx = e.clientX - dragRef.current.startX;
+                  const dy = e.clientY - dragRef.current.startY;
+                  dragRef.current.dx = dx;
+                  dragRef.current.dy = dy;
+                  // si l'utilisateur scrolle verticalement, ne pas bloquer
+                  if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) return;
+                  applyCardTransform(dx);
+                }}
+                onPointerUp={async () => {
+                  if (!dragRef.current.active) return;
+                  dragRef.current.active = false;
+                  const { dx } = dragRef.current;
+                  const threshold = 90;
+                  if (dx > threshold) {
+                    await commitSwipe('right');
+                  } else if (dx < -threshold) {
+                    await commitSwipe('left');
+                  } else {
+                    resetCardTransform();
+                  }
+                }}
+                onPointerCancel={() => {
+                  dragRef.current.active = false;
+                  resetCardTransform();
+                }}
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {currentSwipeOption.title}
+                </h3>
+
+                {currentSwipeOption.description && (
+                  <p className="text-gray-600 text-sm mb-3">{currentSwipeOption.description}</p>
+                )}
+
+                {currentSwipeOption.link && (
+                  <a
+                    href={currentSwipeOption.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1 mb-4"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Voir le lien</span>
+                  </a>
+                )}
+
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <button
+                    onClick={() => commitSwipe('left')}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700"
+                    type="button"
+                  >
+                    <ThumbsDown className="w-4 h-4" />
+                    <span>Non</span>
+                  </button>
+                  <div className="text-sm text-gray-600 font-semibold">
+                    {swipeIndex + 1}/{options.length}
+                  </div>
+                  <button
+                    onClick={() => commitSwipe('right')}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700"
+                    type="button"
+                  >
+                    <ThumbsUp className="w-4 h-4" />
+                    <span>Oui</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+              <p className="text-gray-700 font-semibold">Plus d’options à swiper</p>
+              <p className="text-sm text-gray-600 mt-1">Change de catégorie pour continuer.</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
@@ -285,7 +390,6 @@ interface AddOptionModalProps {
 }
 
 function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps) {
-  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [link, setLink] = useState('');
@@ -297,18 +401,16 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
     setError('');
     setLoading(true);
 
-    const { error: insertError } = await supabase
-      .from('vote_options')
-      .insert({
-        category_id: categoryId,
-        title,
-        description: description || null,
-        link: link || null,
-        added_by: user!.id
-      });
+    const { error: insertError } = await supabase.rpc('add_vote_option', {
+      p_category_id: categoryId,
+      p_title: title,
+      p_description: description || null,
+      p_link: link || null
+    });
 
     if (insertError) {
-      setError('Erreur lors de l\'ajout de l\'option');
+      console.error('Erreur ajout option vote:', insertError);
+      setError(insertError.message || 'Erreur lors de l\'ajout de l\'option');
       setLoading(false);
       return;
     }
