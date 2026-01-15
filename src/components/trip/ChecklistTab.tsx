@@ -171,24 +171,24 @@ export function ChecklistTab({ tripId }: ChecklistTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div className="min-w-0">
           <h2 className="text-2xl font-bold text-gray-900">Checklist</h2>
           <p className="text-gray-600 mt-1">
             {items.filter(i => i.is_completed).length} / {items.length} terminé
           </p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           <button
             onClick={handleGenerateSuggestions}
-            className="flex items-center space-x-2 px-4 py-2 bg-palm-green text-white font-body font-bold rounded-button hover:bg-palm-green/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2 bg-palm-green text-white font-body font-bold rounded-button hover:bg-palm-green/90 transition-all shadow-medium hover:shadow-lg sm:transform sm:hover:-translate-y-1 tracking-wide"
           >
             <Sparkles className="w-5 h-5" />
             <span>Suggestions</span>
           </button>
           <button
             onClick={() => setShowAddItem(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-turquoise text-white font-body font-bold rounded-button hover:bg-turquoise/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2 bg-turquoise text-white font-body font-bold rounded-button hover:bg-turquoise/90 transition-all shadow-medium hover:shadow-lg sm:transform sm:hover:-translate-y-1 tracking-wide"
           >
             <Plus className="w-5 h-5" />
             <span>Ajouter</span>
@@ -219,17 +219,17 @@ export function ChecklistTab({ tripId }: ChecklistTabProps) {
           <p className="text-gray-600 mb-6">
             Générez des suggestions ou ajoutez vos propres éléments
           </p>
-          <div className="flex justify-center space-x-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 max-w-md mx-auto">
             <button
               onClick={handleGenerateSuggestions}
-              className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
             >
               <Sparkles className="w-5 h-5" />
               <span>Générer des suggestions</span>
             </button>
             <button
               onClick={() => setShowAddItem(true)}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+              className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
             >
               Ajouter manuellement
             </button>
@@ -358,7 +358,7 @@ function AddItemModal({ tripId, onClose, onSuccess }: AddItemModalProps) {
         }
       }}
     >
-      <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content">
+      <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
           Ajouter un élément
         </h2>
@@ -401,18 +401,18 @@ function AddItemModal({ tripId, onClose, onSuccess }: AddItemModalProps) {
             />
           </div>
 
-          <div className="flex justify-end space-x-4 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sm:gap-4 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 text-gray-700 hover:text-gray-900 font-medium"
+              className="w-full sm:w-auto px-6 py-2 text-gray-700 hover:text-gray-900 font-medium"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               {loading ? 'Ajout...' : 'Ajouter'}
             </button>

@@ -98,74 +98,109 @@ export function TripView({ tripId, onBack }: TripViewProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-cream font-body">
+    <div className="min-h-[100svh] bg-cream font-body flex flex-col">
       <TripNotifications tripId={tripId} />
-      <div className="bg-white shadow-soft w-full overflow-x-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 w-full">
-          <button
-            onClick={onBack}
-            className="flex items-center space-x-2 text-dark-gray/70 hover:text-dark-gray mb-4 font-body transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 flex-shrink-0" />
-            <span>Retour</span>
-          </button>
-
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <h1 className="text-2xl sm:text-3xl font-heading font-bold text-dark-gray mb-2 break-words">
-                  {trip.name}
-                </h1>
-                {trip.description && (
-                  <p className="text-dark-gray/70 font-body break-words">{trip.description}</p>
-                )}
-              </div>
-              <span className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-heading font-semibold rounded-full whitespace-nowrap flex-shrink-0 ${
-                trip.type === 'roadtrip'
-                  ? 'bg-palm-green/20 text-palm-green'
-                  : 'bg-turquoise/20 text-turquoise'
-              }`}>
-                {trip.type === 'roadtrip' ? 'Road trip' : 'Destination unique'}
-              </span>
+      {/* Header (app-like on mobile) */}
+      <header className="bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 shadow-soft w-full overflow-x-hidden sticky top-0 z-40 pt-[env(safe-area-inset-top)]">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4 w-full">
+          {/* Mobile: compact app bar */}
+          <div className="sm:hidden flex items-center gap-3 min-w-0">
+            <button
+              onClick={onBack}
+              className="p-2 -ml-2 rounded-xl text-dark-gray/70 active:bg-cream transition-colors"
+              aria-label="Retour"
+              type="button"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-dark-gray/60 font-body">Voyage</p>
+              <h1 className="text-base font-heading font-bold text-dark-gray truncate">
+                {trip.name}
+              </h1>
             </div>
-            <div className="flex items-center space-x-4 text-xs sm:text-sm text-dark-gray/60 mt-4 font-body flex-wrap">
-              <span className="break-words">
-                {new Date(trip.start_date).toLocaleDateString('fr-FR')} - {new Date(trip.end_date).toLocaleDateString('fr-FR')}
-              </span>
-            </div>
+            <span className={`px-3 py-1 text-[11px] font-heading font-semibold rounded-full whitespace-nowrap ${
+              trip.type === 'roadtrip'
+                ? 'bg-palm-green/20 text-palm-green'
+                : 'bg-turquoise/20 text-turquoise'
+            }`}>
+              {trip.type === 'roadtrip' ? 'Road trip' : 'Destination unique'}
+            </span>
           </div>
 
-          {/* Tabs desktop */}
-          <div className="hidden sm:flex space-x-1 overflow-x-auto pb-2 -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as Tab)}
-                className={`flex items-center space-x-2 px-4 sm:px-6 py-3 font-body font-medium rounded-t-lg transition-colors whitespace-nowrap flex-shrink-0 ${
-                  activeTab === tab.id
-                    ? 'bg-cream text-turquoise border-b-2 border-turquoise'
-                    : 'text-dark-gray/70 hover:text-dark-gray'
-                }`}
-              >
-                {tab.icon}
-                <span className="text-sm sm:text-base">{tab.label}</span>
-              </button>
-            ))}
+          {/* Desktop/tablet: existing header */}
+          <div className="hidden sm:block">
+            <button
+              onClick={onBack}
+              className="flex items-center space-x-2 text-dark-gray/70 hover:text-dark-gray mb-4 font-body transition-colors"
+              type="button"
+            >
+              <ArrowLeft className="w-5 h-5 flex-shrink-0" />
+              <span>Retour</span>
+            </button>
+
+            <div className="mb-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl sm:text-3xl font-heading font-bold text-dark-gray mb-2 break-words">
+                    {trip.name}
+                  </h1>
+                  {trip.description && (
+                    <p className="text-dark-gray/70 font-body break-words">{trip.description}</p>
+                  )}
+                </div>
+                <span className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-heading font-semibold rounded-full whitespace-nowrap flex-shrink-0 ${
+                  trip.type === 'roadtrip'
+                    ? 'bg-palm-green/20 text-palm-green'
+                    : 'bg-turquoise/20 text-turquoise'
+                }`}>
+                  {trip.type === 'roadtrip' ? 'Road trip' : 'Destination unique'}
+                </span>
+              </div>
+              <div className="flex items-center space-x-4 text-xs sm:text-sm text-dark-gray/60 mt-4 font-body flex-wrap">
+                <span className="break-words">
+                  {new Date(trip.start_date).toLocaleDateString('fr-FR')} - {new Date(trip.end_date).toLocaleDateString('fr-FR')}
+                </span>
+              </div>
+            </div>
+
+            {/* Tabs desktop */}
+            <div className="hidden sm:flex space-x-1 overflow-x-auto pb-2 -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as Tab)}
+                  className={`flex items-center space-x-2 px-4 sm:px-6 py-3 font-body font-medium rounded-t-lg transition-colors whitespace-nowrap flex-shrink-0 ${
+                    activeTab === tab.id
+                      ? 'bg-cream text-turquoise border-b-2 border-turquoise'
+                      : 'text-dark-gray/70 hover:text-dark-gray'
+                  }`}
+                  type="button"
+                >
+                  {tab.icon}
+                  <span className="text-sm sm:text-base">{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 sm:pb-8 w-full overflow-x-hidden">
+      {/* Content */}
+      <main className="flex-1 w-full overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 pb-[calc(84px+env(safe-area-inset-bottom))] sm:pb-8 w-full">
         {activeTab === 'stages' && <StagesTab tripId={tripId} tripType={trip.type} />}
         {activeTab === 'participants' && <ParticipantsTab tripId={tripId} creatorId={trip.creator_id} />}
         {activeTab === 'voting' && <VotingTab tripId={tripId} />}
         {activeTab === 'expenses' && <ExpensesTab tripId={tripId} />}
         {activeTab === 'checklist' && <ChecklistTab tripId={tripId} />}
-      </div>
+        </div>
+      </main>
 
       {/* Bottom tab bar mobile */}
-      <nav className="fixed bottom-0 left-0 right-0 sm:hidden z-50 bg-white border-t border-cream/70 pb-[env(safe-area-inset-bottom)]">
-        <div className="max-w-7xl mx-auto px-2 py-2 grid grid-cols-5 gap-1">
+      <nav className="fixed bottom-0 left-0 right-0 sm:hidden z-50 pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto max-w-7xl px-3">
+          <div className="mb-2 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 border border-cream/60 shadow-soft rounded-2xl px-2 py-2 grid grid-cols-5 gap-1">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -173,8 +208,8 @@ export function TripView({ tripId, onBack }: TripViewProps) {
                 key={`bottom-${tab.id}`}
                 type="button"
                 onClick={() => setActiveTab(tab.id as Tab)}
-                className={`flex flex-col items-center justify-center py-2 rounded-xl transition-colors ${
-                  isActive ? 'bg-cream text-turquoise' : 'text-dark-gray/60 hover:text-dark-gray'
+                className={`flex flex-col items-center justify-center py-2 rounded-xl transition-colors active:scale-[0.98] ${
+                  isActive ? 'bg-cream text-turquoise' : 'text-dark-gray/60'
                 }`}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -187,6 +222,7 @@ export function TripView({ tripId, onBack }: TripViewProps) {
               </button>
             );
           })}
+          </div>
         </div>
       </nav>
     </div>
