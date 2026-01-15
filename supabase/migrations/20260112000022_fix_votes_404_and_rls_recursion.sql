@@ -9,12 +9,21 @@
 
 ALTER TABLE IF EXISTS public.trip_participants ENABLE ROW LEVEL SECURITY;
 
--- Drop policies connues (selon historiques migrations)
-DROP POLICY IF EXISTS "Participants can view trip participants" ON public.trip_participants;
-DROP POLICY IF EXISTS "Participants can view other participants in their trip" ON public.trip_participants;
-DROP POLICY IF EXISTS "Trip creators can add participants" ON public.trip_participants;
-DROP POLICY IF EXISTS "Trip creators can update participants" ON public.trip_participants;
-DROP POLICY IF EXISTS "Trip creators can remove participants" ON public.trip_participants;
+-- Supprimer TOUTES les policies existantes (évite qu'une ancienne policy récursive reste en place)
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'trip_participants'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.trip_participants', r.policyname);
+  END LOOP;
+END
+$$;
 
 -- SELECT sans auto-référence (pas de sous-requête sur trip_participants)
 DROP POLICY IF EXISTS "Creators can view participants of their trips" ON public.trip_participants;
@@ -248,7 +257,8 @@ BEGIN
     vo.created_at,
     COALESCE(SUM(CASE WHEN uv.vote IS TRUE THEN 1 ELSE 0 END), 0)::int AS upvotes,
     COALESCE(SUM(CASE WHEN uv.vote IS FALSE THEN 1 ELSE 0 END), 0)::int AS downvotes,
-    MAX(CASE WHEN uv.user_id = v_user_uuid THEN uv.vote ELSE NULL END) AS user_vote
+    -- bool_or sur 0 ligne => NULL (ce qu'on veut)
+    BOOL_OR(uv.vote) FILTER (WHERE uv.user_id = v_user_uuid) AS user_vote
   FROM public.vote_options vo
   LEFT JOIN public.user_votes uv ON uv.option_id = vo.id
   WHERE vo.category_id = p_category_id
