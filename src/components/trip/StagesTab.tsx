@@ -306,7 +306,10 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
   const [accommodationLink, setAccommodationLink] = useState(existingStage?.accommodation_link || '');
   const [transportToNext, setTransportToNext] = useState(existingStage?.transport_to_next || '');
   const [notes, setNotes] = useState(existingStage?.notes || '');
-  const [pointsOfInterest, setPointsOfInterest] = useState<PointOfInterest[]>([]);
+  const [pointsOfInterest, setPointsOfInterest] = useState<PointOfInterest[]>(() => {
+    const existing = existingStage?.points_of_interest;
+    return Array.isArray(existing) ? existing : [];
+  });
   const [newPoiTitle, setNewPoiTitle] = useState('');
   const [newPoiUrl, setNewPoiUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -679,6 +682,8 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
                     setPointsOfInterest([...pointsOfInterest, {
                       title: selectedPoiForTransport.name,
                       url: selectedPoiForTransport.url,
+                      lat: selectedPoiForTransport.lat,
+                      lng: selectedPoiForTransport.lng,
                       needsTransport: false
                     }]);
                     setSelectedPoi(null);
