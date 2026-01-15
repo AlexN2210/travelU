@@ -77,6 +77,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
   const [swipeIndex, setSwipeIndex] = useState(0);
   const [swipeDx, setSwipeDx] = useState(0);
   const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+  const [mobileVoteView, setMobileVoteView] = useState<'swipe' | 'ranking'>('swipe');
   const [tripLocation, setTripLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
@@ -329,7 +330,8 @@ export function VotingTab({ tripId }: VotingTabProps) {
     const current = options[swipeIndex];
     if (!current) return;
     // UX: avancer immédiatement, et ne pas "annuler" le swipe par un reload d'options.
-    setSwipeIndex((i) => Math.min(i + 1, Math.max(0, options.length - 1)));
+    // IMPORTANT: on autorise swipeIndex === options.length pour afficher "Plus d’options"
+    setSwipeIndex((i) => Math.min(i + 1, options.length));
     setSwipeDx(0);
     void handleVote(current.id, direction === 'right', { reload: false }).catch((e) =>
       console.error('Erreur vote (swipe):', e)
@@ -444,6 +446,14 @@ export function VotingTab({ tripId }: VotingTabProps) {
     );
   }
 
+  const rankedOptions = [...options].sort((a, b) => {
+    const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
+    const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    if ((b.upvotes || 0) !== (a.upvotes || 0)) return (b.upvotes || 0) - (a.upvotes || 0);
+    return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+  });
+
   const currentSwipeOption = options[swipeIndex];
 
   return (
@@ -477,6 +487,33 @@ export function VotingTab({ tripId }: VotingTabProps) {
         ))}
       </div>
 
+      {isCoarsePointer && options.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMobileVoteView('swipe')}
+            className={`px-4 py-2 rounded-xl font-body font-semibold transition-colors ${
+              mobileVoteView === 'swipe'
+                ? 'bg-turquoise text-white'
+                : 'bg-white text-dark-gray border border-cream hover:bg-cream'
+            }`}
+          >
+            Swipe
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileVoteView('ranking')}
+            className={`px-4 py-2 rounded-xl font-body font-semibold transition-colors ${
+              mobileVoteView === 'ranking'
+                ? 'bg-turquoise text-white'
+                : 'bg-white text-dark-gray border border-cream hover:bg-cream'
+            }`}
+          >
+            Classement
+          </button>
+        </div>
+      )}
+
       {options.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -492,7 +529,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
             Ajouter une option
           </button>
         </div>
-      ) : isCoarsePointer ? (
+      ) : isCoarsePointer && mobileVoteView === 'swipe' ? (
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow-sm p-4">
             <p className="text-sm text-gray-600">
@@ -522,7 +559,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
                 </div>
                 <div className="absolute top-4 right-4 z-10 pointer-events-none">
                   <div className="px-3 py-1 rounded-full bg-white/85 text-dark-gray text-xs font-heading font-semibold">
-                    {swipeIndex + 1}/{options.length}
+                    {Math.min(swipeIndex + 1, options.length)}/{options.length}
                   </div>
                 </div>
 
@@ -591,9 +628,64 @@ export function VotingTab({ tripId }: VotingTabProps) {
             </div>
           )}
         </div>
+      ) : isCoarsePointer && mobileVoteView === 'ranking' ? (
+        <div className="space-y-3">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <p className="text-sm text-dark-gray/80 font-body">
+              Classement (trié par score puis likes).
+            </p>
+          </div>
+          {rankedOptions.map((option) => {
+            const score = (option.upvotes || 0) - (option.downvotes || 0);
+            return (
+              <div key={option.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                {option.image_url ? (
+                  <div className="w-full aspect-[16/9] bg-cream">
+                    <VoteOptionImage src={option.image_url} alt={option.title} />
+                  </div>
+                ) : null}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-heading font-bold text-dark-gray break-words">{option.title}</h3>
+                      {option.description && (
+                        <p className="text-sm text-dark-gray/80 mt-1 break-words">{option.description}</p>
+                      )}
+                    </div>
+                    <div className={`shrink-0 text-sm font-heading font-bold tabular-nums ${
+                      score > 0 ? 'text-palm-green' : score < 0 ? 'text-burnt-orange' : 'text-dark-gray/70'
+                    }`}>
+                      {score > 0 ? '+' : ''}{score}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-cream">
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm font-body text-dark-gray/80">
+                        👍 <span className="font-semibold tabular-nums">{option.upvotes || 0}</span>
+                      </div>
+                      <div className="text-sm font-body text-dark-gray/80">
+                        👎 <span className="font-semibold tabular-nums">{option.downvotes || 0}</span>
+                      </div>
+                    </div>
+                    {option.link && (
+                      <a
+                        href={option.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-turquoise hover:opacity-90 text-sm font-body"
+                      >
+                        {getPlatformLabel(option.link)}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
-          {options.map((option) => {
+          {rankedOptions.map((option) => {
             // const totalVotes = option.upvotes + option.downvotes; // Non utilisé pour l'instant
             const score = option.upvotes - option.downvotes;
 
