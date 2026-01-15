@@ -75,11 +75,21 @@ export function VotingTab({ tripId }: VotingTabProps) {
   const [loading, setLoading] = useState(true);
   const [showAddOption, setShowAddOption] = useState(false);
   const [swipeIndex, setSwipeIndex] = useState(0);
+  const [swipeDx, setSwipeDx] = useState(0);
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
   const [tripLocation, setTripLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  const isCoarsePointer = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia?.('(pointer: coarse)')?.matches || window.innerWidth < 768;
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia?.('(pointer: coarse)');
+    const compute = () => setIsCoarsePointer((mq?.matches ?? false) || window.innerWidth < 768);
+    compute();
+    window.addEventListener('resize', compute);
+    mq?.addEventListener?.('change', compute);
+    return () => {
+      window.removeEventListener('resize', compute);
+      mq?.removeEventListener?.('change', compute);
+    };
   }, []);
 
   // Swipe gesture state
@@ -129,10 +139,12 @@ export function VotingTab({ tripId }: VotingTabProps) {
     }
   }, [selectedCategory]);
 
-  // Reset swipe position when options/category change
+  // Reset swipe position when category changes (ne PAS dépendre de options.length,
+  // sinon le swipe est "annulé" dès qu'on recharge les options après un vote)
   useEffect(() => {
     setSwipeIndex(0);
-  }, [selectedCategory, options.length]);
+    setSwipeDx(0);
+  }, [selectedCategory]);
 
   const createDefaultCategoriesFallback = async () => {
     const defaultCategories = [
@@ -269,7 +281,8 @@ export function VotingTab({ tripId }: VotingTabProps) {
     setOptions(optionsWithVotes);
   };
 
-  const handleVote = async (optionId: string, vote: boolean) => {
+  const handleVote = async (optionId: string, vote: boolean, opts?: { reload?: boolean }) => {
+    const shouldReload = opts?.reload ?? true;
     const existingVote = options.find(o => o.id === optionId)?.userVote;
 
     if (existingVote === vote) {
@@ -288,7 +301,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
       }
     }
 
-    if (selectedCategory) {
+    if (shouldReload && selectedCategory) {
       loadOptions(selectedCategory);
     }
   };
@@ -308,14 +321,18 @@ export function VotingTab({ tripId }: VotingTabProps) {
     window.setTimeout(() => {
       if (el) el.style.transition = '';
     }, 160);
+    setSwipeDx(0);
   };
 
   const commitSwipe = async (direction: 'left' | 'right') => {
     const current = options[swipeIndex];
     if (!current) return;
-    await handleVote(current.id, direction === 'right');
+    // UX: avancer immédiatement, et ne pas "annuler" le swipe par un reload d'options.
     setSwipeIndex((i) => Math.min(i + 1, Math.max(0, options.length - 1)));
     resetCardTransform();
+    void handleVote(current.id, direction === 'right', { reload: false }).catch((e) =>
+      console.error('Erreur vote (swipe):', e)
+    );
   };
 
   if (loading) {
@@ -383,10 +400,11 @@ export function VotingTab({ tripId }: VotingTabProps) {
           </div>
 
           {currentSwipeOption ? (
-            <div className="relative">
+            <div className="relative max-w-md mx-auto">
               <div
                 ref={cardRef}
-                className="bg-white rounded-lg shadow-sm p-6 touch-none select-none"
+                className="bg-white rounded-2xl shadow-medium overflow-hidden select-none"
+                style={{ touchAction: 'pan-y' }}
                 onPointerDown={(e) => {
                   // uniquement touch/coarse
                   dragRef.current.active = true;
@@ -394,6 +412,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
                   dragRef.current.startY = e.clientY;
                   dragRef.current.dx = 0;
                   dragRef.current.dy = 0;
+                  setSwipeDx(0);
                   (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
                 }}
                 onPointerMove={(e) => {
@@ -404,6 +423,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
                   dragRef.current.dy = dy;
                   // si l'utilisateur scrolle verticalement, ne pas bloquer
                   if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) return;
+                  setSwipeDx(dx);
                   applyCardTransform(dx);
                 }}
                 onPointerUp={async () => {
@@ -423,50 +443,118 @@ export function VotingTab({ tripId }: VotingTabProps) {
                   dragRef.current.active = false;
                   resetCardTransform();
                 }}
+                onTouchStart={(e) => {
+                  if (!e.touches || e.touches.length !== 1) return;
+                  const t = e.touches[0];
+                  dragRef.current.active = true;
+                  dragRef.current.startX = t.clientX;
+                  dragRef.current.startY = t.clientY;
+                  dragRef.current.dx = 0;
+                  dragRef.current.dy = 0;
+                  setSwipeDx(0);
+                }}
+                onTouchMove={(e) => {
+                  if (!dragRef.current.active || !e.touches || e.touches.length !== 1) return;
+                  const t = e.touches[0];
+                  const dx = t.clientX - dragRef.current.startX;
+                  const dy = t.clientY - dragRef.current.startY;
+                  dragRef.current.dx = dx;
+                  dragRef.current.dy = dy;
+                  // Si geste horizontal, on évite que le scroll prenne le dessus (iOS)
+                  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+                    e.preventDefault();
+                    setSwipeDx(dx);
+                    applyCardTransform(dx);
+                  }
+                }}
+                onTouchEnd={async () => {
+                  if (!dragRef.current.active) return;
+                  dragRef.current.active = false;
+                  const { dx } = dragRef.current;
+                  const threshold = 90;
+                  if (dx > threshold) {
+                    await commitSwipe('right');
+                  } else if (dx < -threshold) {
+                    await commitSwipe('left');
+                  } else {
+                    resetCardTransform();
+                  }
+                }}
               >
-                {currentSwipeOption.image_url && (
-                  <VoteOptionImage src={currentSwipeOption.image_url} alt={currentSwipeOption.title} />
-                )}
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {currentSwipeOption.title}
-                </h3>
+                {/* Overlays swipe */}
+                <div className="absolute top-4 left-4 z-10 pointer-events-none">
+                  {swipeDx > 35 && (
+                    <div className="px-3 py-1 rounded-full bg-palm-green/90 text-white font-heading font-bold text-xs tracking-widest">
+                      OUI
+                    </div>
+                  )}
+                  {swipeDx < -35 && (
+                    <div className="px-3 py-1 rounded-full bg-burnt-orange/90 text-white font-heading font-bold text-xs tracking-widest">
+                      NON
+                    </div>
+                  )}
+                </div>
+                <div className="absolute top-4 right-4 z-10 pointer-events-none">
+                  <div className="px-3 py-1 rounded-full bg-white/85 text-dark-gray text-xs font-heading font-semibold">
+                    {swipeIndex + 1}/{options.length}
+                  </div>
+                </div>
 
-                {currentSwipeOption.description && (
-                  <p className="text-gray-600 text-sm mb-3">{currentSwipeOption.description}</p>
+                {/* Image */}
+                {currentSwipeOption.image_url ? (
+                  <div className="w-full aspect-[4/3] bg-cream">
+                    <VoteOptionImage src={currentSwipeOption.image_url} alt={currentSwipeOption.title} />
+                  </div>
+                ) : (
+                  <div className="w-full aspect-[4/3] bg-cream flex items-center justify-center">
+                    <p className="text-sm text-dark-gray/70 font-body">Aucune image</p>
+                  </div>
                 )}
 
-                {currentSwipeOption.link && (
-                  <a
-                    href={currentSwipeOption.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1 mb-4"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>{getPlatformLabel(currentSwipeOption.link)}</span>
-                  </a>
-                )}
+                {/* Content */}
+                <div className="p-5">
+                  <h3 className="text-lg font-heading font-bold text-dark-gray break-words">
+                    {currentSwipeOption.title}
+                  </h3>
 
-                <div className="flex items-center justify-between pt-4 border-t">
+                  {currentSwipeOption.description && (
+                    <p className="text-dark-gray/80 text-sm font-body mt-2 break-words">
+                      {currentSwipeOption.description}
+                    </p>
+                  )}
+
+                  {currentSwipeOption.link && (
+                    <a
+                      href={currentSwipeOption.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center space-x-2 text-turquoise hover:opacity-90 text-sm font-body"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>{getPlatformLabel(currentSwipeOption.link)}</span>
+                    </a>
+                  )}
+
+                  <div className="flex items-center justify-between pt-4 mt-4 border-t border-cream">
                   <button
                     onClick={() => commitSwipe('left')}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700"
+                    className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-burnt-orange/10 text-burnt-orange font-body font-semibold"
                     type="button"
                   >
                     <ThumbsDown className="w-4 h-4" />
                     <span>Non</span>
                   </button>
-                  <div className="text-sm text-gray-600 font-semibold">
-                    {swipeIndex + 1}/{options.length}
-                  </div>
                   <button
                     onClick={() => commitSwipe('right')}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700"
+                    className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-palm-green/10 text-palm-green font-body font-semibold"
                     type="button"
                   >
                     <ThumbsUp className="w-4 h-4" />
                     <span>Oui</span>
                   </button>
+                </div>
                 </div>
               </div>
             </div>
