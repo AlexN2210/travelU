@@ -37,6 +37,10 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  const projectionRef = useRef<google.maps.MapCanvasProjection | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchMovedRef = useRef(false);
 
   const [nearbyOpen, setNearbyOpen] = useState(false);
   const [nearbyLoading, setNearbyLoading] = useState(false);
@@ -100,6 +104,17 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
     // Créer PlacesService sur la map (pour nearbySearch)
     if (typeof google !== 'undefined' && google.maps?.places) {
       placesServiceRef.current = new google.maps.places.PlacesService(mapInstance);
+    }
+    // Créer une OverlayView invisible pour obtenir une projection (conversion pixel -> lat/lng)
+    if (typeof google !== 'undefined' && google.maps?.OverlayView) {
+      const overlay = new google.maps.OverlayView();
+      overlay.onAdd = () => {};
+      overlay.draw = () => {
+        // getProjection() devient dispo après draw()
+        projectionRef.current = overlay.getProjection();
+      };
+      overlay.onRemove = () => {};
+      overlay.setMap(mapInstance);
     }
     if (validStages.length > 1 && typeof google !== 'undefined' && google.maps) {
       const bounds = new google.maps.LatLngBounds();
@@ -208,6 +223,87 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
     }
   };
 
+  const handlePickPoint = (lat: number, lng: number) => {
+    const stageId = findNearestStageId(lat, lng);
+    setNearbyLocation({ lat, lng });
+    setNearbyStageId(stageId);
+    setNearbyOpen(true);
+    void fetchNearbyActivities(lat, lng);
+  };
+
+  // Support mobile/tablette: appui prolongé (touch) sur la carte
+  useEffect(() => {
+    if (!map) return;
+
+    const div = map.getDiv();
+    if (!div) return;
+
+    const clearTimer = () => {
+      if (longPressTimerRef.current) {
+        window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
+    const onTouchStart = (ev: TouchEvent) => {
+      if (!ev.touches || ev.touches.length !== 1) return;
+      touchMovedRef.current = false;
+
+      const t = ev.touches[0];
+      const rect = div.getBoundingClientRect();
+      touchStartRef.current = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+
+      clearTimer();
+      // Long press ~ 550ms
+      longPressTimerRef.current = window.setTimeout(() => {
+        if (touchMovedRef.current) return;
+        const start = touchStartRef.current;
+        const proj = projectionRef.current;
+        if (!start || !proj) return;
+
+        // Convertit pixel (container) -> LatLng
+        const latLng = proj.fromContainerPixelToLatLng(new google.maps.Point(start.x, start.y));
+        if (!latLng) return;
+        handlePickPoint(latLng.lat(), latLng.lng());
+      }, 550);
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      if (!touchStartRef.current || !ev.touches || ev.touches.length !== 1) return;
+      const t = ev.touches[0];
+      const rect = div.getBoundingClientRect();
+      const x = t.clientX - rect.left;
+      const y = t.clientY - rect.top;
+      const dx = x - touchStartRef.current.x;
+      const dy = y - touchStartRef.current.y;
+      // Si l'utilisateur “glisse” (pan/scroll), on annule le long press
+      if (Math.sqrt(dx * dx + dy * dy) > 10) {
+        touchMovedRef.current = true;
+        clearTimer();
+      }
+    };
+
+    const onTouchEnd = () => {
+      clearTimer();
+      touchStartRef.current = null;
+      touchMovedRef.current = false;
+    };
+
+    // passive: true pour ne pas bloquer le scroll / gestures
+    div.addEventListener('touchstart', onTouchStart, { passive: true });
+    div.addEventListener('touchmove', onTouchMove, { passive: true });
+    div.addEventListener('touchend', onTouchEnd, { passive: true });
+    div.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+    return () => {
+      clearTimer();
+      div.removeEventListener('touchstart', onTouchStart as any);
+      div.removeEventListener('touchmove', onTouchMove as any);
+      div.removeEventListener('touchend', onTouchEnd as any);
+      div.removeEventListener('touchcancel', onTouchEnd as any);
+    };
+  }, [map, validStages]);
+
   if (!apiKey) {
     return (
       <div className="bg-cream rounded-button h-96 flex items-center justify-center">
@@ -249,16 +345,9 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
         zoom={zoom}
         onLoad={onLoad}
         onRightClick={(e) => {
-          // Sur mobile: appui prolongé = "rightclick"
+          // Desktop / souris: clic droit
           if (!e.latLng) return;
-          const lat = e.latLng.lat();
-          const lng = e.latLng.lng();
-          const stageId = findNearestStageId(lat, lng);
-
-          setNearbyLocation({ lat, lng });
-          setNearbyStageId(stageId);
-          setNearbyOpen(true);
-          void fetchNearbyActivities(lat, lng);
+          handlePickPoint(e.latLng.lat(), e.latLng.lng());
         }}
         options={{
           styles: [
