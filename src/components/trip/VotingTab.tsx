@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, ThumbsUp, ThumbsDown, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -94,86 +94,6 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
   // Swipe gesture state
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef({
-    active: false,
-    startX: 0,
-    startY: 0,
-    dx: 0,
-    dy: 0
-  });
-
-  // Swipe mobile: listeners natifs (React peut rendre touchmove "passif" => preventDefault ignoré)
-  useEffect(() => {
-    if (!isCoarsePointer) return;
-    const el = cardRef.current;
-    if (!el) return;
-
-    let active = false;
-    let startX = 0;
-    let startY = 0;
-    let dx = 0;
-    let dy = 0;
-
-    const threshold = 80;
-
-    const onTouchStart = (ev: TouchEvent) => {
-      if (!ev.touches || ev.touches.length !== 1) return;
-      active = true;
-      const t = ev.touches[0];
-      startX = t.clientX;
-      startY = t.clientY;
-      dx = 0;
-      dy = 0;
-      setSwipeDx(0);
-    };
-
-    const onTouchMove = (ev: TouchEvent) => {
-      if (!active || !ev.touches || ev.touches.length !== 1) return;
-      const t = ev.touches[0];
-      dx = t.clientX - startX;
-      dy = t.clientY - startY;
-
-      // Geste horizontal => on prend la main (sinon on laisse le scroll vertical)
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
-        ev.preventDefault();
-        setSwipeDx(dx);
-        applyCardTransform(dx);
-      }
-    };
-
-    const finish = async () => {
-      if (!active) return;
-      active = false;
-      if (dx > threshold) {
-        await commitSwipe('right');
-      } else if (dx < -threshold) {
-        await commitSwipe('left');
-      } else {
-        resetCardTransform();
-      }
-    };
-
-    const onTouchEnd = () => {
-      void finish();
-    };
-
-    const onTouchCancel = () => {
-      active = false;
-      resetCardTransform();
-    };
-
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd, { passive: true });
-    el.addEventListener('touchcancel', onTouchCancel, { passive: true });
-
-    return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
-      el.removeEventListener('touchcancel', onTouchCancel);
-    };
-  }, [isCoarsePointer, commitSwipe]);
 
   useEffect(() => {
     loadCategories();
@@ -407,6 +327,80 @@ export function VotingTab({ tripId }: VotingTabProps) {
       console.error('Erreur vote (swipe):', e)
     );
   };
+
+  // Swipe mobile: listeners natifs (React peut rendre touchmove "passif" => preventDefault ignoré)
+  // IMPORTANT: ce hook doit être APRES la définition de commitSwipe (sinon TDZ -> "Cannot access before initialization")
+  useEffect(() => {
+    if (!isCoarsePointer) return;
+    const el = cardRef.current;
+    if (!el) return;
+
+    let active = false;
+    let startX = 0;
+    let startY = 0;
+    let dx = 0;
+    let dy = 0;
+
+    const threshold = 80;
+
+    const onTouchStart = (ev: TouchEvent) => {
+      if (!ev.touches || ev.touches.length !== 1) return;
+      active = true;
+      const t = ev.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      dx = 0;
+      dy = 0;
+      setSwipeDx(0);
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      if (!active || !ev.touches || ev.touches.length !== 1) return;
+      const t = ev.touches[0];
+      dx = t.clientX - startX;
+      dy = t.clientY - startY;
+
+      // Geste horizontal => on prend la main (sinon on laisse le scroll vertical)
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+        ev.preventDefault();
+        setSwipeDx(dx);
+        applyCardTransform(dx);
+      }
+    };
+
+    const finish = async () => {
+      if (!active) return;
+      active = false;
+      if (dx > threshold) {
+        await commitSwipe('right');
+      } else if (dx < -threshold) {
+        await commitSwipe('left');
+      } else {
+        resetCardTransform();
+      }
+    };
+
+    const onTouchEnd = () => {
+      void finish();
+    };
+
+    const onTouchCancel = () => {
+      active = false;
+      resetCardTransform();
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', onTouchCancel, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchCancel);
+    };
+  }, [isCoarsePointer, commitSwipe]);
 
   if (loading) {
     return (
