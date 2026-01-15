@@ -98,6 +98,39 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
     }
   };
 
+  const handleAddPoiToStageFromMap = async (poi: PointOfInterest, stageId: string) => {
+    const stage = stages.find(s => s.id === stageId);
+    if (!stage) {
+      alert('Étape introuvable pour ajouter cette activité.');
+      return;
+    }
+
+    const current = Array.isArray(stage.points_of_interest) ? stage.points_of_interest : [];
+    const next = [
+      ...current.filter(p =>
+        !(
+          p.title === poi.title &&
+          p.lat === poi.lat &&
+          p.lng === poi.lng
+        )
+      ),
+      poi
+    ];
+
+    const { error } = await supabase.rpc('update_stage', {
+      p_stage_id: stage.id,
+      p_points_of_interest: next
+    });
+
+    if (error) {
+      console.error('Erreur ajout activité depuis la carte:', error);
+      alert(`Impossible d’ajouter l’activité: ${error.message || 'Erreur inconnue'}`);
+      return;
+    }
+
+    await loadStages();
+  };
+
   if (loading) {
     return (
       <div className="text-center py-12">
@@ -253,7 +286,7 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
             <h3 className="text-base sm:text-lg font-semibold text-dark-gray mb-4 break-words">Carte</h3>
             {stages.length > 0 ? (
               <div className="w-full overflow-hidden">
-                <StagesMapGoogle stages={stages} />
+                <StagesMapGoogle stages={stages} onAddPoiToStage={handleAddPoiToStageFromMap} />
               </div>
             ) : (
               <div className="bg-cream rounded-button h-64 sm:h-96 flex items-center justify-center w-full">

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { GoogleMap, useLoadScript, Marker, Polyline, InfoWindow } from '@react-google-maps/api';
 
 interface PointOfInterest {
@@ -20,6 +20,7 @@ interface Stage {
 
 interface StagesMapGoogleProps {
   stages: Stage[];
+  onAddPoiToStage?: (poi: PointOfInterest, stageId: string) => void | Promise<void>;
 }
 
 const containerStyle = {
@@ -35,6 +36,14 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+
+  const [nearbyOpen, setNearbyOpen] = useState(false);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyError, setNearbyError] = useState('');
+  const [nearbyLocation, setNearbyLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearbyStageId, setNearbyStageId] = useState<string | null>(null);
+  const [nearbySuggestions, setNearbySuggestions] = useState<PointOfInterest[]>([]);
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -88,12 +97,114 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
 
   const onLoad = (mapInstance: google.maps.Map) => {
     setMap(mapInstance);
+    // Créer PlacesService sur la map (pour nearbySearch)
+    if (typeof google !== 'undefined' && google.maps?.places) {
+      placesServiceRef.current = new google.maps.places.PlacesService(mapInstance);
+    }
     if (validStages.length > 1 && typeof google !== 'undefined' && google.maps) {
       const bounds = new google.maps.LatLngBounds();
       validStages.forEach(stage => {
         bounds.extend(new google.maps.LatLng(stage.latitude, stage.longitude));
       });
       mapInstance.fitBounds(bounds);
+    }
+  };
+
+  const haversineMeters = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const R = 6371000;
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+    const lat1 = (a.lat * Math.PI) / 180;
+    const lat2 = (b.lat * Math.PI) / 180;
+    const x =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+    return R * c;
+  };
+
+  const findNearestStageId = (lat: number, lng: number) => {
+    if (validStages.length === 0) return null;
+    let bestId = validStages[0].id;
+    let bestDist = Infinity;
+    for (const s of validStages) {
+      const d = haversineMeters({ lat, lng }, { lat: s.latitude, lng: s.longitude });
+      if (d < bestDist) {
+        bestDist = d;
+        bestId = s.id;
+      }
+    }
+    return bestId;
+  };
+
+  const fetchNearbyActivities = async (lat: number, lng: number) => {
+    setNearbyLoading(true);
+    setNearbyError('');
+    setNearbySuggestions([]);
+
+    if (!placesServiceRef.current) {
+      setNearbyError('Service Places indisponible (vérifiez la librairie Google "places").');
+      setNearbyLoading(false);
+      return;
+    }
+
+    try {
+      const location = new google.maps.LatLng(lat, lng);
+      const types: string[] = [
+        'tourist_attraction',
+        'museum',
+        'park',
+        'art_gallery',
+        'restaurant',
+        'cafe'
+      ];
+
+      const seen = new Set<string>();
+      const merged: PointOfInterest[] = [];
+
+      const runNearby = (type: string) =>
+        new Promise<void>((resolve) => {
+          placesServiceRef.current?.nearbySearch(
+            {
+              location,
+              radius: 1000, // 1 km
+              type,
+              language: 'fr'
+            },
+            (results, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                for (const place of results) {
+                  if (merged.length >= 5) break;
+                  const id = place.place_id || place.name || `${type}-${place.vicinity}`;
+                  if (seen.has(id)) continue;
+                  if (!place.name || !place.geometry?.location) continue;
+                  seen.add(id);
+                  merged.push({
+                    title: place.name,
+                    url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.place_id}`,
+                    lat: place.geometry.location.lat(),
+                    lng: place.geometry.location.lng(),
+                    needsTransport: false
+                  });
+                }
+              }
+              resolve();
+            }
+          );
+        });
+
+      await Promise.all(types.map(runNearby));
+
+      if (merged.length === 0) {
+        setNearbyError('Aucune activité trouvée à moins de 1 km.');
+      } else {
+        setNearbySuggestions(merged.slice(0, 5));
+      }
+    } catch (e) {
+      console.error('Erreur nearbySearch:', e);
+      setNearbyError('Erreur lors de la recherche d’activités à proximité.');
+    } finally {
+      setNearbyLoading(false);
     }
   };
 
@@ -137,6 +248,18 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
         center={center}
         zoom={zoom}
         onLoad={onLoad}
+        onRightClick={(e) => {
+          // Sur mobile: appui prolongé = "rightclick"
+          if (!e.latLng) return;
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          const stageId = findNearestStageId(lat, lng);
+
+          setNearbyLocation({ lat, lng });
+          setNearbyStageId(stageId);
+          setNearbyOpen(true);
+          void fetchNearbyActivities(lat, lng);
+        }}
         options={{
           styles: [
             {
@@ -205,8 +328,9 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
             .map((poi, poiIndex) => {
               const poiIconUrl = `data:image/svg+xml;base64,${btoa(`
                 <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" fill="#00B4D8" stroke="white" stroke-width="2"/>
-                  <path d="M12 6v6l4 2" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+                  <!-- Pin "map marker" -->
+                  <path d="M12 2C8.686 2 6 4.686 6 8c0 4.5 6 14 6 14s6-9.5 6-14c0-3.314-2.686-6-6-6z" fill="#00B4D8" stroke="white" stroke-width="2"/>
+                  <circle cx="12" cy="8" r="2.5" fill="white"/>
                 </svg>
               `)}`;
               
@@ -217,7 +341,8 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
                   icon={{
                     url: poiIconUrl,
                     scaledSize: new google.maps.Size(24, 24),
-                    anchor: new google.maps.Point(12, 12)
+                    // ancre en bas du pin
+                    anchor: new google.maps.Point(12, 24)
                   }}
                 />
               );
@@ -234,6 +359,93 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
           />
         )}
       </GoogleMap>
+
+      {nearbyOpen && (
+        <div
+          className="absolute inset-0 bg-black/40 flex items-center justify-center p-4 z-10"
+          onClick={() => setNearbyOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-medium w-full max-w-md p-4 sm:p-6"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="min-w-0">
+                <h3 className="text-lg font-heading font-bold text-dark-gray break-words">
+                  Activités à proximité (1 km)
+                </h3>
+                {nearbyLocation && (
+                  <p className="text-xs text-dark-gray/60 font-body">
+                    Point: {nearbyLocation.lat.toFixed(4)}, {nearbyLocation.lng.toFixed(4)}
+                  </p>
+                )}
+                {nearbyStageId && (
+                  <p className="text-xs text-dark-gray/60 font-body">
+                    Étape ciblée: {validStages.find(s => s.id === nearbyStageId)?.name || '—'}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="text-dark-gray/60 hover:text-dark-gray"
+                onClick={() => setNearbyOpen(false)}
+                aria-label="Fermer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {nearbyLoading && (
+              <div className="text-center py-6">
+                <div className="w-10 h-10 border-4 border-turquoise border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="mt-3 text-sm text-dark-gray/70 font-body">Recherche en cours…</p>
+              </div>
+            )}
+
+            {!nearbyLoading && nearbyError && (
+              <div className="bg-burnt-orange/10 border border-burnt-orange/30 rounded-button p-3 text-burnt-orange text-sm font-body">
+                {nearbyError}
+              </div>
+            )}
+
+            {!nearbyLoading && !nearbyError && nearbySuggestions.length > 0 && (
+              <div className="space-y-2">
+                {nearbySuggestions.map((sugg, idx) => (
+                  <div key={`${sugg.title}-${idx}`} className="bg-cream rounded-lg p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-body font-semibold text-dark-gray break-words">{sugg.title}</p>
+                      <a
+                        href={sugg.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-turquoise hover:text-turquoise/80 font-body break-all"
+                      >
+                        Voir sur la carte
+                      </a>
+                    </div>
+                    <button
+                      type="button"
+                      className="px-3 py-2 bg-turquoise text-white font-body font-semibold rounded-button hover:bg-turquoise/90 transition-colors flex-shrink-0"
+                      onClick={async () => {
+                        if (!nearbyStageId) return;
+                        try {
+                          await onAddPoiToStage?.(sugg, nearbyStageId);
+                          setNearbyOpen(false);
+                        } catch (err) {
+                          console.error('Erreur add poi:', err);
+                          setNearbyError('Erreur lors de l’ajout de l’activité.');
+                        }
+                      }}
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
