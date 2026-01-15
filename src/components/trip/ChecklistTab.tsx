@@ -90,11 +90,7 @@ export function ChecklistTab({ tripId }: ChecklistTabProps) {
 
   const loadItems = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('checklist_items')
-      .select('*')
-      .eq('trip_id', tripId)
-      .order('created_at', { ascending: true });
+    const { data, error } = await supabase.rpc('get_trip_checklist_items', { p_trip_id: tripId });
 
     if (!error && data) {
       setItems(data);
@@ -103,13 +99,10 @@ export function ChecklistTab({ tripId }: ChecklistTabProps) {
   };
 
   const handleToggleItem = async (itemId: string, currentState: boolean) => {
-    const { error } = await supabase
-      .from('checklist_items')
-      .update({
-        is_completed: !currentState,
-        completed_by: !currentState ? user!.id : null
-      })
-      .eq('id', itemId);
+    const { error } = await supabase.rpc('set_checklist_item_completed', {
+      p_item_id: itemId,
+      p_is_completed: !currentState
+    });
 
     if (!error) {
       loadItems();
@@ -117,10 +110,7 @@ export function ChecklistTab({ tripId }: ChecklistTabProps) {
   };
 
   const handleDeleteItem = async (itemId: string) => {
-    const { error } = await supabase
-      .from('checklist_items')
-      .delete()
-      .eq('id', itemId);
+    const { error } = await supabase.rpc('delete_checklist_item', { p_item_id: itemId });
 
     if (!error) {
       loadItems();
@@ -146,9 +136,14 @@ export function ChecklistTab({ tripId }: ChecklistTabProps) {
     }
 
     if (newItems.length > 0) {
-      const { error } = await supabase
-        .from('checklist_items')
-        .insert(newItems);
+      const { error } = await supabase.rpc('add_checklist_items_bulk', {
+        p_trip_id: tripId,
+        p_items: newItems.map((i) => ({
+          category: i.category,
+          item: i.item,
+          is_auto_generated: true
+        }))
+      });
 
       if (!error) {
         loadItems();
@@ -328,18 +323,16 @@ function AddItemModal({ tripId, onClose, onSuccess }: AddItemModalProps) {
     setError('');
     setLoading(true);
 
-    const { error: insertError } = await supabase
-      .from('checklist_items')
-      .insert({
-        trip_id: tripId,
-        category,
-        item,
-        is_completed: false,
-        is_auto_generated: false
-      });
+    const { error: insertError } = await supabase.rpc('add_checklist_item', {
+      p_trip_id: tripId,
+      p_category: category,
+      p_item: item,
+      p_is_auto_generated: false
+    });
 
     if (insertError) {
-      setError('Erreur lors de l\'ajout');
+      console.error('Erreur ajout checklist:', insertError);
+      setError(insertError.message || 'Erreur lors de l\'ajout');
       setLoading(false);
       return;
     }

@@ -40,6 +40,15 @@ interface ExpensesTabProps {
   tripId: string;
 }
 
+const EXPENSE_CATEGORY_UI: Record<string, { label: string; badgeClass: string }> = {
+  restaurant: { label: 'Restaurant / Bar', badgeClass: 'bg-burnt-orange/15 text-burnt-orange' },
+  courses: { label: 'Courses', badgeClass: 'bg-gold/20 text-gold' },
+  transport: { label: 'Transport', badgeClass: 'bg-turquoise/20 text-turquoise' },
+  hebergement: { label: 'Hébergement', badgeClass: 'bg-palm-green/20 text-palm-green' },
+  activite: { label: 'Activité', badgeClass: 'bg-turquoise/10 text-turquoise' },
+  autre: { label: 'Autre', badgeClass: 'bg-cream text-dark-gray/70' }
+};
+
 export function ExpensesTab({ tripId }: ExpensesTabProps) {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -49,56 +58,59 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
   const [participants, setParticipants] = useState<ParticipantProfile[]>([]);
 
   useEffect(() => {
-    loadExpenses();
+    // Charger participants puis dépenses (labels cohérents)
+    loadParticipantsAndExpenses();
   }, [tripId]);
 
-  useEffect(() => {
-    loadParticipants();
-  }, [tripId]);
+  const loadParticipantsAndExpenses = async () => {
+    setLoading(true);
 
-  const loadParticipants = async () => {
-    const { data, error } = await supabase.rpc('get_trip_participant_profiles', { p_trip_id: tripId });
-    if (error) {
-      console.error('Erreur chargement participants profils:', error);
-      setParticipants([]);
+    // 1) Participants (avec profils)
+    const { data: participantsData, error: participantsError } = await supabase.rpc(
+      'get_trip_participant_profiles',
+      { p_trip_id: tripId }
+    );
+
+    const loadedParticipants = (participantsError ? [] : (participantsData || [])) as ParticipantProfile[];
+    if (participantsError) {
+      console.error('Erreur chargement participants profils:', participantsError);
+    }
+    setParticipants(loadedParticipants);
+
+    // 2) Dépenses
+    const { data: expensesData, error: expensesError } = await supabase.rpc('get_trip_expenses', { p_trip_id: tripId });
+    if (expensesError) {
+      console.error('Erreur chargement dépenses:', expensesError);
+      setExpenses([]);
+      setBalances([]);
+      setLoading(false);
       return;
     }
-    setParticipants((data || []) as ParticipantProfile[]);
-  };
 
-  const loadExpenses = async () => {
-    setLoading(true);
-    const { data: expensesData, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('trip_id', tripId)
-      .order('created_at', { ascending: false });
+    const labelById = new Map<string, string>();
+    loadedParticipants.forEach((p) => labelById.set(p.user_id, formatParticipantLabel(p, user?.id)));
+    if (user?.id) labelById.set(user.id, 'Moi');
 
-    if (!error && expensesData) {
-      // map user_id -> label
-      const labelById = new Map<string, string>();
-      participants.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p, user?.id)));
-      if (user?.id) labelById.set(user.id, 'Moi');
+    const normalizedExpenses: Expense[] = (expensesData || []).map((expense: any) => ({
+      ...expense,
+      // jsonb -> array (supabase retourne généralement déjà un array)
+      split_between: Array.isArray(expense.split_between) ? expense.split_between : [],
+      payer_email: labelById.get(expense.paid_by) || (expense.paid_by === user?.id ? 'Moi' : 'Participant')
+    }));
 
-      const expensesWithEmails = expensesData.map((expense) => {
-        return {
-          ...expense,
-          payer_email: labelById.get(expense.paid_by) || (expense.paid_by === user?.id ? 'Moi' : 'Participant')
-        };
-      });
-      setExpenses(expensesWithEmails);
-      calculateBalances(expensesWithEmails);
-    }
+    setExpenses(normalizedExpenses);
+    calculateBalances(normalizedExpenses, loadedParticipants);
     setLoading(false);
   };
 
-  const calculateBalances = async (expensesData: Expense[]) => {
+  const calculateBalances = (expensesData: Expense[], participantsList: ParticipantProfile[]) => {
     const balanceMap = new Map<string, number>();
-    const ids = participants.map(p => p.user_id);
+    const ids = participantsList.map(p => p.user_id);
     ids.forEach(id => balanceMap.set(id, 0));
 
     for (const expense of expensesData) {
       const splitCount = expense.split_between.length;
+      if (splitCount === 0) continue;
       const amountPerPerson = expense.amount / splitCount;
 
       balanceMap.set(expense.paid_by, (balanceMap.get(expense.paid_by) || 0) + expense.amount);
@@ -109,7 +121,7 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
     }
 
     const labelById = new Map<string, string>();
-    participants.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p, user?.id)));
+    participantsList.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p, user?.id)));
     if (user?.id) labelById.set(user.id, 'Moi');
 
     const balancesWithEmails = Array.from(balanceMap.entries()).map(([userId, balance]) => {
@@ -126,13 +138,14 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
   const handleDeleteExpense = async (expenseId: string) => {
     if (!confirm('Supprimer cette dépense ?')) return;
 
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('id', expenseId);
+    // Préférer une RPC (si présente) pour éviter RLS; fallback sinon
+    const { error: rpcError } = await supabase.rpc('delete_expense', { p_expense_id: expenseId });
+    const { error } = rpcError
+      ? await supabase.from('expenses').delete().eq('id', expenseId)
+      : { error: null };
 
     if (!error) {
-      loadExpenses();
+      loadParticipantsAndExpenses();
     }
   };
 
@@ -241,8 +254,10 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
                     <h3 className="text-lg font-semibold text-gray-900">
                       {expense.description}
                     </h3>
-                    <span className="px-3 py-1 bg-turquoise/20 text-turquoise text-xs font-heading font-semibold rounded-full">
-                      {expense.category}
+                    <span className={`px-3 py-1 text-xs font-heading font-semibold rounded-full ${
+                      EXPENSE_CATEGORY_UI[expense.category]?.badgeClass || 'bg-cream text-dark-gray/70'
+                    }`}>
+                      {EXPENSE_CATEGORY_UI[expense.category]?.label || expense.category}
                     </span>
                   </div>
                   <div className="flex items-center space-x-4 text-sm text-gray-600">
@@ -279,7 +294,7 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
           onClose={() => setShowAddExpense(false)}
           onSuccess={() => {
             setShowAddExpense(false);
-            loadExpenses();
+            loadParticipantsAndExpenses();
           }}
         />
       )}
@@ -297,7 +312,7 @@ interface AddExpenseModalProps {
 function AddExpenseModal({ tripId, participants, onClose, onSuccess }: AddExpenseModalProps) {
   const { user } = useAuth();
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState('restaurant');
   const [description, setDescription] = useState('');
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -333,19 +348,17 @@ function AddExpenseModal({ tripId, participants, onClose, onSuccess }: AddExpens
 
     setLoading(true);
 
-    const { error: insertError } = await supabase
-      .from('expenses')
-      .insert({
-        trip_id: tripId,
-        amount: amountNum,
-        category,
-        description,
-        paid_by: user!.id,
-        split_between: selectedParticipants
-      });
+    const { error: insertError } = await supabase.rpc('create_expense', {
+      p_trip_id: tripId,
+      p_amount: amountNum,
+      p_category: category,
+      p_description: description,
+      p_split_between: selectedParticipants
+    });
 
     if (insertError) {
-      setError('Erreur lors de l\'ajout de la dépense');
+      console.error('Erreur ajout dépense:', insertError);
+      setError(insertError.message || 'Erreur lors de l\'ajout de la dépense');
       setLoading(false);
       return;
     }
@@ -416,14 +429,18 @@ function AddExpenseModal({ tripId, participants, onClose, onSuccess }: AddExpens
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Catégorie *
             </label>
-            <input
-              type="text"
+            <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Ex: Restaurant, Transport, Hébergement..."
-            />
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-turquoise focus:border-transparent bg-white"
+            >
+              <option value="restaurant">Restaurant / Bar</option>
+              <option value="courses">Courses</option>
+              <option value="transport">Transport</option>
+              <option value="hebergement">Hébergement</option>
+              <option value="activite">Activité</option>
+              <option value="autre">Autre</option>
+            </select>
           </div>
 
           <div>
