@@ -94,6 +94,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
   // Swipe gesture state
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const commitSwipeRef = useRef<(direction: 'left' | 'right') => Promise<void>>(async () => {});
 
   useEffect(() => {
     loadCategories();
@@ -328,6 +329,10 @@ export function VotingTab({ tripId }: VotingTabProps) {
     );
   };
 
+  // IMPORTANT: on garde une ref vers la dernière version de commitSwipe
+  // (sinon le hook des listeners touch se ré-attache à chaque render et casse le gesture).
+  commitSwipeRef.current = commitSwipe;
+
   // Swipe mobile: listeners natifs (React peut rendre touchmove "passif" => preventDefault ignoré)
   // IMPORTANT: ce hook doit être APRES la définition de commitSwipe (sinon TDZ -> "Cannot access before initialization")
   useEffect(() => {
@@ -372,9 +377,9 @@ export function VotingTab({ tripId }: VotingTabProps) {
       if (!active) return;
       active = false;
       if (dx > threshold) {
-        await commitSwipe('right');
+        await commitSwipeRef.current('right');
       } else if (dx < -threshold) {
-        await commitSwipe('left');
+        await commitSwipeRef.current('left');
       } else {
         resetCardTransform();
       }
@@ -400,7 +405,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
       el.removeEventListener('touchend', onTouchEnd);
       el.removeEventListener('touchcancel', onTouchCancel);
     };
-  }, [isCoarsePointer, commitSwipe]);
+  }, [isCoarsePointer]);
 
   if (loading) {
     return (
