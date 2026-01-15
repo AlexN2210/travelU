@@ -135,7 +135,8 @@ export function TripView({ tripId, onBack }: TripViewProps) {
             </div>
           </div>
 
-          <div className="flex space-x-1 overflow-x-auto pb-2 -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide">
+          {/* Tabs desktop */}
+          <div className="hidden sm:flex space-x-1 overflow-x-auto pb-2 -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -154,13 +155,40 @@ export function TripView({ tripId, onBack }: TripViewProps) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full overflow-x-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 sm:pb-8 w-full overflow-x-hidden">
         {activeTab === 'stages' && <StagesTab tripId={tripId} tripType={trip.type} />}
         {activeTab === 'participants' && <ParticipantsTab tripId={tripId} creatorId={trip.creator_id} />}
         {activeTab === 'voting' && <VotingTab tripId={tripId} />}
         {activeTab === 'expenses' && <ExpensesTab tripId={tripId} />}
         {activeTab === 'checklist' && <ChecklistTab tripId={tripId} />}
       </div>
+
+      {/* Bottom tab bar mobile */}
+      <nav className="fixed bottom-0 left-0 right-0 sm:hidden z-50 bg-white border-t border-cream/70 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-w-7xl mx-auto px-2 py-2 grid grid-cols-5 gap-1">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={`bottom-${tab.id}`}
+                type="button"
+                onClick={() => setActiveTab(tab.id as Tab)}
+                className={`flex flex-col items-center justify-center py-2 rounded-xl transition-colors ${
+                  isActive ? 'bg-cream text-turquoise' : 'text-dark-gray/60 hover:text-dark-gray'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <div className={`${isActive ? 'text-turquoise' : 'text-dark-gray/60'}`}>
+                  {tab.icon}
+                </div>
+                <span className="text-[11px] font-body font-semibold leading-none mt-1">
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
