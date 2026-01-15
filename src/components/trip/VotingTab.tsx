@@ -29,6 +29,32 @@ interface VotingTabProps {
   tripId: string;
 }
 
+function VoteOptionImage({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src) return null;
+
+  return (
+    <div className="mb-4">
+      {!failed ? (
+        <img
+          src={src}
+          alt={alt}
+          className="w-full h-64 object-cover rounded-xl border border-cream"
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="w-full h-64 rounded-xl border border-cream bg-cream flex items-center justify-center px-4 text-center">
+          <p className="text-sm text-dark-gray/70 font-body break-words">
+            Impossible de charger l’image. Utilise une URL directe d’image (ex: `.jpg`, `.png`) ou une image hébergée publiquement.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function VotingTab({ tripId }: VotingTabProps) {
   const { user } = useAuth();
   const [categories, setCategories] = useState<VoteCategory[]>([]);
@@ -359,18 +385,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
                 }}
               >
                 {currentSwipeOption.image_url && (
-                  <div className="mb-4">
-                    <img
-                      src={currentSwipeOption.image_url}
-                      alt={currentSwipeOption.title}
-                      className="w-full h-64 object-cover rounded-xl border border-cream"
-                      loading="lazy"
-                      onError={(e) => {
-                        // Si l'image ne charge pas, on la masque
-                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
+                  <VoteOptionImage src={currentSwipeOption.image_url} alt={currentSwipeOption.title} />
                 )}
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {currentSwipeOption.title}
@@ -430,6 +445,9 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
             return (
               <div key={option.id} className="bg-white rounded-lg shadow-sm p-6">
+                {option.image_url && (
+                  <VoteOptionImage src={option.image_url} alt={option.title} />
+                )}
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {option.title}
                 </h3>
@@ -517,6 +535,7 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
   const [description, setDescription] = useState('');
   const [link, setLink] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imagePreviewError, setImagePreviewError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -634,20 +653,27 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
               type="url"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
+              onInput={() => setImagePreviewError(false)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="https://.../photo.jpg"
             />
             {imageUrl && (
               <div className="mt-3">
-                <img
-                  src={imageUrl}
-                  alt="Aperçu"
-                  className="w-full h-40 object-cover rounded-xl border border-gray-200"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                {!imagePreviewError ? (
+                  <img
+                    src={imageUrl}
+                    alt="Aperçu"
+                    className="w-full h-40 object-cover rounded-xl border border-gray-200"
+                    loading="lazy"
+                    onError={() => setImagePreviewError(true)}
+                  />
+                ) : (
+                  <div className="w-full h-40 rounded-xl border border-gray-200 bg-cream flex items-center justify-center px-4 text-center">
+                    <p className="text-xs text-dark-gray/70 font-body break-words">
+                      Aperçu indisponible. Vérifie que c’est une URL directe d’image (ex: `.jpg`, `.png`) et accessible publiquement.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
