@@ -63,6 +63,21 @@ export function VotePlacesAutocomplete({
       ? new Set(['restaurant', 'bar', 'cafe'])
       : new Set(['tourist_attraction', 'museum', 'park', 'art_gallery', 'amusement_park', 'zoo', 'aquarium']);
 
+  const maxDistanceKm = mode === 'restaurant' ? 80 : 200;
+
+  const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const R = 6371;
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+    const lat1 = (a.lat * Math.PI) / 180;
+    const lat2 = (b.lat * Math.PI) / 180;
+    const x =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+    return R * c;
+  };
+
   const doSearch = (searchQuery: string) => {
     if (searchQuery.length < 2) {
       setSuggestions([]);
@@ -82,7 +97,8 @@ export function VotePlacesAutocomplete({
     let locationBias: google.maps.Circle | undefined;
     if (latitude && longitude) {
       const location = new google.maps.LatLng(latitude, longitude);
-      locationBias = new google.maps.Circle({ center: location, radius: 10000 });
+      // biais plus large pour éviter les résultats globaux
+      locationBias = new google.maps.Circle({ center: location, radius: 50000 });
     }
 
     // On récupère large (establishment + point_of_interest) puis on filtre par types réels via getDetails
@@ -107,7 +123,7 @@ export function VotePlacesAutocomplete({
           new Promise<any | null>((resolve) => {
             const detailsRequest: google.maps.places.PlaceDetailsRequest = {
               placeId: prediction.place_id,
-              fields: ['name', 'formatted_address', 'types', 'photos', 'place_id']
+              fields: ['name', 'formatted_address', 'types', 'photos', 'place_id', 'geometry']
             };
             placesServiceRef.current!.getDetails(detailsRequest, (place, status) => {
               if (status !== google.maps.places.PlacesServiceStatus.OK || !place) return resolve(null);
@@ -115,6 +131,15 @@ export function VotePlacesAutocomplete({
               const types = place.types || [];
               const ok = types.some(t => allowedTypes.has(t));
               if (!ok) return resolve(null);
+
+              // Filtre distance pour éviter des suggestions à l'étranger (ex: USA) quand on connaît la destination
+              if (latitude && longitude && place.geometry?.location) {
+                const dist = haversineKm(
+                  { lat: latitude, lng: longitude },
+                  { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() }
+                );
+                if (dist > maxDistanceKm) return resolve(null);
+              }
 
               const imageUrl =
                 place.photos && place.photos.length > 0

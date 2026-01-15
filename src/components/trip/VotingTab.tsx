@@ -75,6 +75,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
   const [loading, setLoading] = useState(true);
   const [showAddOption, setShowAddOption] = useState(false);
   const [swipeIndex, setSwipeIndex] = useState(0);
+  const [tripLocation, setTripLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const isCoarsePointer = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -93,6 +94,33 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
   useEffect(() => {
     loadCategories();
+  }, [tripId]);
+
+  // Charger un point de référence (destination) pour biaiser Google Places sur la bonne zone
+  useEffect(() => {
+    const loadTripLocation = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_trip_stages', { trip_uuid: tripId });
+        if (error || !data || !Array.isArray(data) || data.length === 0) return;
+
+        const coords = data
+          .map((s: any) => ({ lat: Number(s.latitude), lng: Number(s.longitude) }))
+          .filter((c: any) => Number.isFinite(c.lat) && Number.isFinite(c.lng));
+
+        if (coords.length === 0) return;
+
+        // moyenne simple (fonctionne pour destination unique + roadtrip)
+        const avg = coords.reduce(
+          (acc: any, c: any) => ({ lat: acc.lat + c.lat, lng: acc.lng + c.lng }),
+          { lat: 0, lng: 0 }
+        );
+        setTripLocation({ lat: avg.lat / coords.length, lng: avg.lng / coords.length });
+      } catch (e) {
+        console.warn('Impossible de charger la localisation du voyage pour Places:', e);
+      }
+    };
+
+    if (tripId) loadTripLocation();
   }, [tripId]);
 
   useEffect(() => {
@@ -524,6 +552,8 @@ export function VotingTab({ tripId }: VotingTabProps) {
           categoryId={selectedCategory}
           categoryName={categories.find(c => c.id === selectedCategory)?.name}
           categoryTitle={categories.find(c => c.id === selectedCategory)?.title}
+          latitude={tripLocation?.lat}
+          longitude={tripLocation?.lng}
           onClose={() => setShowAddOption(false)}
           onSuccess={() => {
             setShowAddOption(false);
@@ -541,6 +571,8 @@ interface AddOptionModalProps {
   categoryId: string;
   categoryName?: string;
   categoryTitle?: string;
+  latitude?: number;
+  longitude?: number;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -593,7 +625,7 @@ function getCategoryCopy(categoryName?: string, categoryTitle?: string) {
   }
 }
 
-function AddOptionModal({ categoryId, categoryName, categoryTitle, onClose, onSuccess }: AddOptionModalProps) {
+function AddOptionModal({ categoryId, categoryName, categoryTitle, latitude, longitude, onClose, onSuccess }: AddOptionModalProps) {
   const { user } = useAuth();
   const copy = getCategoryCopy(categoryName, categoryTitle);
   const [title, setTitle] = useState('');
@@ -714,6 +746,8 @@ function AddOptionModal({ categoryId, categoryName, categoryTitle, onClose, onSu
               </label>
               <VotePlacesAutocomplete
                 mode={categoryName === 'restaurant' ? 'restaurant' : 'activity'}
+                latitude={latitude}
+                longitude={longitude}
                 placeholder={
                   categoryName === 'restaurant'
                     ? 'Rechercher un restaurant, bar ou café...'
