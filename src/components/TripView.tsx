@@ -200,7 +200,7 @@ export function TripView({ tripId, onBack }: TripViewProps) {
       {/* Bottom tab bar mobile */}
       <nav className="fixed bottom-0 left-0 right-0 sm:hidden z-50 pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-7xl px-3">
-          <div className="mb-2 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 border border-cream/60 shadow-soft rounded-2xl px-2 py-2 grid grid-cols-5 gap-1">
+          <div className="mb-2 bg-white border border-cream/70 shadow-soft rounded-2xl px-2 py-2 grid grid-cols-5 gap-1">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
