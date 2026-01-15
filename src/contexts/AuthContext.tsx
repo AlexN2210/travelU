@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ data: { user: User | null } | null; error: Error | null }>;
+  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ data: { user: User | null } | null; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -29,11 +29,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (async () => {
         setSession(session);
         setUser(session?.user ?? null);
+        // Créer/mettre à jour le profil dès qu'on a un user authentifié
+        if (session?.user) {
+          try {
+            await supabase.rpc('ensure_profile');
+          } catch (e) {
+            console.warn('ensure_profile failed:', e);
+          }
+        }
       })();
     });
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
     try {
       console.log('Tentative d\'inscription pour:', email);
       if (import.meta.env.DEV) {
@@ -46,7 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
-            email_verified: false
+            email_verified: false,
+            first_name: firstName || null,
+            last_name: lastName || null
           }
         }
       });
@@ -63,6 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Même si pas de session immédiate (confirmation email requise)
       if (!error && data?.user) {
         console.log('Inscription réussie (email peut nécessiter confirmation)');
+        // tenter de créer le profil si session dispo (sinon ce sera fait au prochain login)
+        try {
+          await supabase.rpc('ensure_profile');
+        } catch {
+          // ignore
+        }
         return { data: { user: data.user }, error: null };
       }
       

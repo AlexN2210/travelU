@@ -17,8 +17,24 @@ interface Expense {
 
 interface Balance {
   userId: string;
-  userEmail: string;
+  userLabel: string;
   balance: number;
+}
+
+type ParticipantProfile = {
+  user_id: string;
+  permission: 'read' | 'edit' | string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+};
+
+function formatParticipantLabel(p: ParticipantProfile) {
+  const name = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+  if (name && p.email) return `${name} (${p.email})`;
+  if (name) return name;
+  if (p.email) return p.email;
+  return 'Utilisateur';
 }
 
 interface ExpensesTabProps {
@@ -31,10 +47,25 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
   const [balances, setBalances] = useState<Balance[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddExpense, setShowAddExpense] = useState(false);
+  const [participants, setParticipants] = useState<ParticipantProfile[]>([]);
 
   useEffect(() => {
     loadExpenses();
   }, [tripId]);
+
+  useEffect(() => {
+    loadParticipants();
+  }, [tripId]);
+
+  const loadParticipants = async () => {
+    const { data, error } = await supabase.rpc('get_trip_participant_profiles', { p_trip_id: tripId });
+    if (error) {
+      console.error('Erreur chargement participants profils:', error);
+      setParticipants([]);
+      return;
+    }
+    setParticipants((data || []) as ParticipantProfile[]);
+  };
 
   const loadExpenses = async () => {
     setLoading(true);
@@ -45,10 +76,15 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
       .order('created_at', { ascending: false });
 
     if (!error && expensesData) {
+      // map user_id -> label
+      const labelById = new Map<string, string>();
+      participants.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p)));
+      if (user?.id && user.email) labelById.set(user.id, user.email);
+
       const expensesWithEmails = expensesData.map((expense) => {
         return {
           ...expense,
-          payer_email: expense.paid_by === user?.id ? user.email : 'Utilisateur'
+          payer_email: labelById.get(expense.paid_by) || (expense.paid_by === user?.id ? user.email : 'Utilisateur')
         };
       });
       setExpenses(expensesWithEmails);
@@ -58,15 +94,9 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
   };
 
   const calculateBalances = async (expensesData: Expense[]) => {
-    const { data: participants } = await supabase
-      .from('trip_participants')
-      .select('user_id')
-      .eq('trip_id', tripId);
-
-    if (!participants) return;
-
     const balanceMap = new Map<string, number>();
-    participants.forEach(p => balanceMap.set(p.user_id, 0));
+    const ids = participants.map(p => p.user_id);
+    ids.forEach(id => balanceMap.set(id, 0));
 
     for (const expense of expensesData) {
       const splitCount = expense.split_between.length;
@@ -79,10 +109,14 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
       });
     }
 
+    const labelById = new Map<string, string>();
+    participants.forEach(p => labelById.set(p.user_id, formatParticipantLabel(p)));
+    if (user?.id && user.email) labelById.set(user.id, user.email);
+
     const balancesWithEmails = Array.from(balanceMap.entries()).map(([userId, balance]) => {
       return {
         userId,
-        userEmail: userId === user?.id ? user.email : 'Utilisateur',
+        userLabel: labelById.get(userId) || (userId === user?.id ? user.email : 'Utilisateur'),
         balance
       };
     });
@@ -170,7 +204,7 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
           <div className="space-y-3">
             {balances.map((balance) => (
               <div key={balance.userId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span className="font-medium text-gray-900">{balance.userEmail}</span>
+                <span className="font-medium text-gray-900">{balance.userLabel}</span>
                 <span className={`font-bold ${
                   balance.balance > 0 ? 'text-green-600' : balance.balance < 0 ? 'text-red-600' : 'text-gray-600'
                 }`}>
@@ -242,6 +276,7 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
       {showAddExpense && (
         <AddExpenseModal
           tripId={tripId}
+          participants={participants}
           onClose={() => setShowAddExpense(false)}
           onSuccess={() => {
             setShowAddExpense(false);
@@ -255,41 +290,24 @@ export function ExpensesTab({ tripId }: ExpensesTabProps) {
 
 interface AddExpenseModalProps {
   tripId: string;
+  participants: ParticipantProfile[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function AddExpenseModal({ tripId, onClose, onSuccess }: AddExpenseModalProps) {
+function AddExpenseModal({ tripId, participants, onClose, onSuccess }: AddExpenseModalProps) {
   const { user } = useAuth();
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
-  const [participants, setParticipants] = useState<{ id: string; email: string }[]>([]);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadParticipants();
-  }, []);
-
-  const loadParticipants = async () => {
-    const { data: participantsData } = await supabase
-      .from('trip_participants')
-      .select('user_id')
-      .eq('trip_id', tripId);
-
-    if (participantsData) {
-      const participantsWithEmails = participantsData.map((p) => {
-        return {
-          id: p.user_id,
-          email: p.user_id === user?.id ? user.email : 'Utilisateur'
-        };
-      });
-      setParticipants(participantsWithEmails);
-      setSelectedParticipants(participantsWithEmails.map(p => p.id));
-    }
-  };
+    // pré-sélectionner tous les participants au chargement de la modale
+    setSelectedParticipants(participants.map(p => p.user_id));
+  }, [participants]);
 
   const toggleParticipant = (userId: string) => {
     setSelectedParticipants(prev =>
@@ -416,16 +434,16 @@ function AddExpenseModal({ tripId, onClose, onSuccess }: AddExpenseModalProps) {
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {participants.map((participant) => (
                 <label
-                  key={participant.id}
+                  key={participant.user_id}
                   className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
                 >
                   <input
                     type="checkbox"
-                    checked={selectedParticipants.includes(participant.id)}
-                    onChange={() => toggleParticipant(participant.id)}
+                    checked={selectedParticipants.includes(participant.user_id)}
+                    onChange={() => toggleParticipant(participant.user_id)}
                     className="w-4 h-4 text-blue-600"
                   />
-                  <span className="text-sm text-gray-900">{participant.email}</span>
+                  <span className="text-sm text-gray-900">{formatParticipantLabel(participant)}</span>
                 </label>
               ))}
             </div>

@@ -10,6 +10,8 @@ interface SignupPageProps {
 
 export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
   const { signUp } = useAuth();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,7 +36,7 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
 
     setLoading(true);
     try {
-      const { data, error } = await signUp(email, password);
+      const { data, error } = await signUp(email, password, firstName.trim(), lastName.trim());
 
       if (error) {
         console.error('Erreur d\'inscription complète:', error);
@@ -123,6 +125,37 @@ export function SignupPage({ onSwitchToLogin, onBack }: SignupPageProps) {
                     <span className="text-sm whitespace-pre-line">{error}</span>
                   </div>
                 )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="firstName" className="block text-sm font-medium text-dark-gray mb-2 font-body">
+                      Prénom
+                    </label>
+                    <input
+                      id="firstName"
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                      className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent transition-colors font-body"
+                      placeholder="Prénom"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lastName" className="block text-sm font-medium text-dark-gray mb-2 font-body">
+                      Nom
+                    </label>
+                    <input
+                      id="lastName"
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                      className="w-full px-4 py-2 border border-cream rounded-button focus:ring-2 focus:ring-turquoise focus:border-transparent transition-colors font-body"
+                      placeholder="Nom"
+                    />
+                  </div>
+                </div>
 
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-dark-gray mb-2 font-body">

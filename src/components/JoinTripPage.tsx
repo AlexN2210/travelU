@@ -121,7 +121,7 @@ export function JoinTripPage() {
     setLoading(true);
     try {
       // Créer le compte utilisateur
-      const { data: signUpData, error: signUpError } = await signUp(email, password);
+      const { data: signUpData, error: signUpError } = await signUp(email, password, firstName.trim(), lastName.trim());
 
       if (signUpError) {
         const errorMessage = signUpError.message || signUpError.toString();
