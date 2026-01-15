@@ -17,6 +17,7 @@ DROP POLICY IF EXISTS "Trip creators can update participants" ON public.trip_par
 DROP POLICY IF EXISTS "Trip creators can remove participants" ON public.trip_participants;
 
 -- SELECT sans auto-référence (pas de sous-requête sur trip_participants)
+DROP POLICY IF EXISTS "Creators can view participants of their trips" ON public.trip_participants;
 CREATE POLICY "Creators can view participants of their trips"
   ON public.trip_participants FOR SELECT
   TO authenticated
@@ -29,12 +30,14 @@ CREATE POLICY "Creators can view participants of their trips"
     )
   );
 
+DROP POLICY IF EXISTS "Users can view their own participant row" ON public.trip_participants;
 CREATE POLICY "Users can view their own participant row"
   ON public.trip_participants FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
 
 -- INSERT/UPDATE/DELETE: créateur uniquement (simple, non récursif)
+DROP POLICY IF EXISTS "Creators can add participants" ON public.trip_participants;
 CREATE POLICY "Creators can add participants"
   ON public.trip_participants FOR INSERT
   TO authenticated
@@ -46,6 +49,7 @@ CREATE POLICY "Creators can add participants"
     )
   );
 
+DROP POLICY IF EXISTS "Creators can update participants" ON public.trip_participants;
 CREATE POLICY "Creators can update participants"
   ON public.trip_participants FOR UPDATE
   TO authenticated
@@ -64,6 +68,7 @@ CREATE POLICY "Creators can update participants"
     )
   );
 
+DROP POLICY IF EXISTS "Creators can delete participants" ON public.trip_participants;
 CREATE POLICY "Creators can delete participants"
   ON public.trip_participants FOR DELETE
   TO authenticated
