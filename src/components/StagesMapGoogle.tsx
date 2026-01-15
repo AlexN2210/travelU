@@ -70,61 +70,6 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
     setIsMounted(true);
   }, []);
 
-  if (!isMounted || stages.length === 0) {
-    return (
-      <div className="bg-cream rounded-button h-96 flex items-center justify-center">
-        <div className="text-center text-dark-gray/60 font-body">
-          <div className="w-8 h-8 border-4 border-turquoise border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p>Chargement de la carte...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const firstStage = validStages[0];
-  if (!firstStage || typeof firstStage.latitude !== 'number' || typeof firstStage.longitude !== 'number') {
-    return (
-      <div className="bg-cream rounded-button h-96 flex items-center justify-center">
-        <div className="text-center text-dark-gray/60 font-body">
-          <p>Coordonnées invalides</p>
-        </div>
-      </div>
-    );
-  }
-
-  const center = {
-    lat: firstStage.latitude,
-    lng: firstStage.longitude
-  };
-
-  const zoom = stages.length === 1 ? 12 : stages.length === 2 ? 8 : 6;
-
-  const onLoad = (mapInstance: google.maps.Map) => {
-    setMap(mapInstance);
-    // Créer PlacesService sur la map (pour nearbySearch)
-    if (typeof google !== 'undefined' && google.maps?.places) {
-      placesServiceRef.current = new google.maps.places.PlacesService(mapInstance);
-    }
-    // Créer une OverlayView invisible pour obtenir une projection (conversion pixel -> lat/lng)
-    if (typeof google !== 'undefined' && google.maps?.OverlayView) {
-      const overlay = new google.maps.OverlayView();
-      overlay.onAdd = () => {};
-      overlay.draw = () => {
-        // getProjection() devient dispo après draw()
-        projectionRef.current = overlay.getProjection();
-      };
-      overlay.onRemove = () => {};
-      overlay.setMap(mapInstance);
-    }
-    if (validStages.length > 1 && typeof google !== 'undefined' && google.maps) {
-      const bounds = new google.maps.LatLngBounds();
-      validStages.forEach(stage => {
-        bounds.extend(new google.maps.LatLng(stage.latitude, stage.longitude));
-      });
-      mapInstance.fitBounds(bounds);
-    }
-  };
-
   const haversineMeters = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
     const R = 6371000;
     const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -232,6 +177,7 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
   };
 
   // Support mobile/tablette: appui prolongé (touch) sur la carte
+  // IMPORTANT: ce hook doit rester AVANT tout "return" conditionnel (sinon erreur React #310).
   useEffect(() => {
     if (!map) return;
 
@@ -260,8 +206,8 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
         const start = touchStartRef.current;
         const proj = projectionRef.current;
         if (!start || !proj) return;
+        if (typeof google === 'undefined' || !google.maps) return;
 
-        // Convertit pixel (container) -> LatLng
         const latLng = proj.fromContainerPixelToLatLng(new google.maps.Point(start.x, start.y));
         if (!latLng) return;
         handlePickPoint(latLng.lat(), latLng.lng());
@@ -276,7 +222,6 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
       const y = t.clientY - rect.top;
       const dx = x - touchStartRef.current.x;
       const dy = y - touchStartRef.current.y;
-      // Si l'utilisateur “glisse” (pan/scroll), on annule le long press
       if (Math.sqrt(dx * dx + dy * dy) > 10) {
         touchMovedRef.current = true;
         clearTimer();
@@ -289,7 +234,6 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
       touchMovedRef.current = false;
     };
 
-    // passive: true pour ne pas bloquer le scroll / gestures
     div.addEventListener('touchstart', onTouchStart, { passive: true });
     div.addEventListener('touchmove', onTouchMove, { passive: true });
     div.addEventListener('touchend', onTouchEnd, { passive: true });
@@ -303,6 +247,61 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
       div.removeEventListener('touchcancel', onTouchEnd as any);
     };
   }, [map, validStages]);
+
+  if (!isMounted || stages.length === 0) {
+    return (
+      <div className="bg-cream rounded-button h-96 flex items-center justify-center">
+        <div className="text-center text-dark-gray/60 font-body">
+          <div className="w-8 h-8 border-4 border-turquoise border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+          <p>Chargement de la carte...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const firstStage = validStages[0];
+  if (!firstStage || typeof firstStage.latitude !== 'number' || typeof firstStage.longitude !== 'number') {
+    return (
+      <div className="bg-cream rounded-button h-96 flex items-center justify-center">
+        <div className="text-center text-dark-gray/60 font-body">
+          <p>Coordonnées invalides</p>
+        </div>
+      </div>
+    );
+  }
+
+  const center = {
+    lat: firstStage.latitude,
+    lng: firstStage.longitude
+  };
+
+  const zoom = stages.length === 1 ? 12 : stages.length === 2 ? 8 : 6;
+
+  const onLoad = (mapInstance: google.maps.Map) => {
+    setMap(mapInstance);
+    // Créer PlacesService sur la map (pour nearbySearch)
+    if (typeof google !== 'undefined' && google.maps?.places) {
+      placesServiceRef.current = new google.maps.places.PlacesService(mapInstance);
+    }
+    // Créer une OverlayView invisible pour obtenir une projection (conversion pixel -> lat/lng)
+    if (typeof google !== 'undefined' && google.maps?.OverlayView) {
+      const overlay = new google.maps.OverlayView();
+      overlay.onAdd = () => {};
+      overlay.draw = () => {
+        // getProjection() devient dispo après draw()
+        projectionRef.current = overlay.getProjection();
+      };
+      overlay.onRemove = () => {};
+      overlay.setMap(mapInstance);
+    }
+    if (validStages.length > 1 && typeof google !== 'undefined' && google.maps) {
+      const bounds = new google.maps.LatLngBounds();
+      validStages.forEach(stage => {
+        bounds.extend(new google.maps.LatLng(stage.latitude, stage.longitude));
+      });
+      mapInstance.fitBounds(bounds);
+    }
+  };
 
   if (!apiKey) {
     return (
