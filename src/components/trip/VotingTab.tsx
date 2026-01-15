@@ -17,6 +17,7 @@ interface VoteOption {
   title: string;
   description: string | null;
   link: string | null;
+  image_url?: string | null;
   added_by: string;
   created_at: string;
   upvotes: number;
@@ -357,6 +358,20 @@ export function VotingTab({ tripId }: VotingTabProps) {
                   resetCardTransform();
                 }}
               >
+                {currentSwipeOption.image_url && (
+                  <div className="mb-4">
+                    <img
+                      src={currentSwipeOption.image_url}
+                      alt={currentSwipeOption.title}
+                      className="w-full h-64 object-cover rounded-xl border border-cream"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Si l'image ne charge pas, on la masque
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {currentSwipeOption.title}
                 </h3>
@@ -501,6 +516,7 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [link, setLink] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -513,7 +529,8 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
       p_category_id: categoryId,
       p_title: title,
       p_description: description || null,
-      p_link: link || null
+      p_link: link || null,
+      p_image_url: imageUrl || null
     });
 
     if (insertError) {
@@ -524,6 +541,7 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
         title,
         description: description || null,
         link: link || null,
+        image_url: imageUrl || null,
         added_by: user!.id
       });
 
@@ -606,6 +624,32 @@ function AddOptionModal({ categoryId, onClose, onSuccess }: AddOptionModalProps)
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="https://..."
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Image (URL) (optionnel)
+            </label>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="https://.../photo.jpg"
+            />
+            {imageUrl && (
+              <div className="mt-3">
+                <img
+                  src={imageUrl}
+                  alt="Aperçu"
+                  className="w-full h-40 object-cover rounded-xl border border-gray-200"
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end space-x-4 pt-4">
