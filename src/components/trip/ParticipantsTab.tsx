@@ -117,12 +117,25 @@ export function ParticipantsTab({ tripId, creatorId }: ParticipantsTabProps) {
   };
 
   const handleChangePermission = async (participantId: string, newPermission: 'read' | 'edit') => {
-    const { error } = await supabase
-      .from('trip_participants')
-      .update({ permission: newPermission })
-      .eq('id', participantId);
+    // Trouver le participant pour obtenir son user_id
+    const participant = participants.find(p => p.id === participantId);
+    if (!participant) {
+      console.error('Participant introuvable');
+      return;
+    }
 
-    if (!error) {
+    // Utiliser la fonction PostgreSQL pour mettre à jour la permission
+    const { error } = await supabase
+      .rpc('update_participant_permission', {
+        p_trip_id: tripId,
+        p_user_id: participant.user_id,
+        p_new_permission: newPermission
+      });
+
+    if (error) {
+      console.error('Erreur lors de la mise à jour de la permission:', error);
+      alert(`Erreur lors de la mise à jour: ${error.message || 'Erreur inconnue'}`);
+    } else {
       loadParticipants();
     }
   };
