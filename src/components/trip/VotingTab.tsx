@@ -308,6 +308,8 @@ export function VotingTab({ tripId }: VotingTabProps) {
   const applyCardTransform = (dx: number) => {
     const el = cardRef.current;
     if (!el) return;
+    // Pendant le drag, pas de transition (sinon effet "collant")
+    el.style.transition = '';
     const rotate = Math.max(-12, Math.min(12, dx / 20));
     el.style.transform = `translateX(${dx}px) rotate(${rotate}deg)`;
   };
@@ -328,7 +330,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
     if (!current) return;
     // UX: avancer immédiatement, et ne pas "annuler" le swipe par un reload d'options.
     setSwipeIndex((i) => Math.min(i + 1, Math.max(0, options.length - 1)));
-    resetCardTransform();
+    setSwipeDx(0);
     void handleVote(current.id, direction === 'right', { reload: false }).catch((e) =>
       console.error('Erreur vote (swipe):', e)
     );
@@ -337,6 +339,28 @@ export function VotingTab({ tripId }: VotingTabProps) {
   // IMPORTANT: on garde une ref vers la dernière version de commitSwipe
   // (sinon le hook des listeners touch se ré-attache à chaque render et casse le gesture).
   commitSwipeRef.current = commitSwipe;
+
+  const animateSwipeOut = async (direction: 'left' | 'right') => {
+    const el = cardRef.current;
+    if (!el) {
+      await commitSwipeRef.current(direction);
+      return;
+    }
+    const width = el.getBoundingClientRect().width || 320;
+    const offX = (direction === 'right' ? 1 : -1) * (width * 1.2);
+    const rotate = direction === 'right' ? 10 : -10;
+
+    el.style.transition = 'transform 180ms ease-out';
+    el.style.transform = `translateX(${offX}px) rotate(${rotate}deg)`;
+
+    // Après l’anim, on commit et on remet la carte au centre (sans transition) pour la prochaine option.
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 190));
+    await commitSwipeRef.current(direction);
+
+    // Reset DOM pour la prochaine carte
+    el.style.transition = '';
+    el.style.transform = 'translateX(0px) rotate(0deg)';
+  };
 
   // Swipe mobile: listeners natifs (React peut rendre touchmove "passif" => preventDefault ignoré)
   // IMPORTANT: ce hook doit être APRES la définition de commitSwipe (sinon TDZ -> "Cannot access before initialization")
@@ -351,7 +375,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
     let dx = 0;
     let dy = 0;
 
-    const threshold = 80;
+    const threshold = 55;
 
     const onTouchStart = (ev: TouchEvent) => {
       if (!ev.touches || ev.touches.length !== 1) return;
@@ -382,9 +406,9 @@ export function VotingTab({ tripId }: VotingTabProps) {
       if (!active) return;
       active = false;
       if (dx > threshold) {
-        await commitSwipeRef.current('right');
+        await animateSwipeOut('right');
       } else if (dx < -threshold) {
-        await commitSwipeRef.current('left');
+        await animateSwipeOut('left');
       } else {
         resetCardTransform();
       }
@@ -541,7 +565,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
                   <div className="flex items-center justify-between pt-4 mt-4 border-t border-cream">
                   <button
-                    onClick={() => commitSwipe('left')}
+                    onClick={() => animateSwipeOut('left')}
                     className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-burnt-orange/10 text-burnt-orange font-body font-semibold"
                     type="button"
                   >
@@ -549,7 +573,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
                     <span>Non</span>
                   </button>
                   <button
-                    onClick={() => commitSwipe('right')}
+                    onClick={() => animateSwipeOut('right')}
                     className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-palm-green/10 text-palm-green font-body font-semibold"
                     type="button"
                   >
