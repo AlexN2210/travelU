@@ -172,10 +172,12 @@ export function VotingTab({ tripId }: VotingTabProps) {
           .maybeSingle();
         if (tripErr || !trip) return;
 
-        const start = trip.start_date ? new Date(`${trip.start_date}T00:00:00`) : null;
-        const end = trip.end_date ? new Date(`${trip.end_date}T00:00:00`) : null;
+        // IMPORTANT: utiliser UTC pour éviter les décalages timezone/DST
+        const start = trip.start_date ? new Date(`${trip.start_date}T00:00:00Z`) : null;
+        const end = trip.end_date ? new Date(`${trip.end_date}T00:00:00Z`) : null;
         if (start && end && Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())) {
-          const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          const msPerDay = 1000 * 60 * 60 * 24;
+          const diffDays = Math.round((end.getTime() - start.getTime()) / msPerDay);
           setTripNights(Math.max(1, diffDays || 1));
         }
 
@@ -380,7 +382,36 @@ export function VotingTab({ tripId }: VotingTabProps) {
   };
 
   const selectedCategoryName = categories.find((c) => c.id === selectedCategory)?.name;
-  const isAccommodationCategory = selectedCategoryName === 'accommodation';
+  const isAccommodationCategory = (() => {
+    const n = (selectedCategoryName || '').toLowerCase().trim();
+    if (!n) return false;
+    // compat: anciennes valeurs éventuelles + accents
+    return (
+      n === 'accommodation' ||
+      n === 'hebergement' ||
+      n === 'hébergement' ||
+      n.includes('heberg') ||
+      n.includes('héberg')
+    );
+  })();
+
+  const computeAccommodationPrices = (
+    priceText: string,
+    participants: number,
+    nights: number
+  ): { total: number; perPerson: number; perPersonPerNight: number } | null => {
+    const base = parsePriceToNumber(priceText);
+    if (!base) return null;
+    const p = Math.max(1, participants);
+    const n = Math.max(1, nights);
+
+    // IMPORTANT: règle produit (confirmée): le prix saisi est TOUJOURS le prix TOTAL du séjour
+    // (toutes nuits + toutes personnes). On calcule donc seulement des répartitions.
+    const total = base;
+    const perPerson = total / p;
+    const perPersonPerNight = total / p / n;
+    return { total, perPerson, perPersonPerNight };
+  };
 
   const handleVote = async (optionId: string, vote: boolean, opts?: { reload?: boolean }) => {
     const shouldReload = opts?.reload ?? true;
@@ -760,10 +791,12 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
                   {isAccommodationCategory && currentSwipeOption.price && (
                     (() => {
-                      const total = parsePriceToNumber(currentSwipeOption.price);
-                      if (!total) return null;
-                      const perPerson = total / Math.max(1, tripParticipantsCount);
-                      const perPersonPerNight = total / Math.max(1, tripParticipantsCount) / Math.max(1, tripNights);
+                      const computed = computeAccommodationPrices(
+                        currentSwipeOption.price,
+                        tripParticipantsCount,
+                        tripNights
+                      );
+                      if (!computed) return null;
                       return (
                         <div className="mt-3 rounded-xl bg-cream border border-cream p-3">
                           <div className="text-xs text-dark-gray/70 font-body">
@@ -772,15 +805,15 @@ export function VotingTab({ tripId }: VotingTabProps) {
                           <div className="mt-1 grid grid-cols-3 gap-2">
                             <div>
                               <div className="text-[11px] text-dark-gray/70">Total</div>
-                              <div className="text-sm font-heading font-bold tabular-nums">{total.toFixed(2)} €</div>
+                              <div className="text-sm font-heading font-bold tabular-nums">{computed.total.toFixed(2)} €</div>
                             </div>
                             <div>
                               <div className="text-[11px] text-dark-gray/70">/ pers</div>
-                              <div className="text-sm font-heading font-bold tabular-nums">{perPerson.toFixed(2)} €</div>
+                              <div className="text-sm font-heading font-bold tabular-nums">{computed.perPerson.toFixed(2)} €</div>
                             </div>
                             <div>
                               <div className="text-[11px] text-dark-gray/70">/ pers / nuit</div>
-                              <div className="text-sm font-heading font-bold tabular-nums">{perPersonPerNight.toFixed(2)} €</div>
+                              <div className="text-sm font-heading font-bold tabular-nums">{computed.perPersonPerNight.toFixed(2)} €</div>
                             </div>
                           </div>
                         </div>
@@ -1332,7 +1365,7 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder={isAccommodation ? 'Ex: 1200 € (prix total du séjour)' : 'Ex: 25€/pers'}
+              placeholder={isAccommodation ? 'Ex: 1200 € (prix total du séjour, tout inclus)' : 'Ex: 25€/pers'}
             />
           </div>
 
