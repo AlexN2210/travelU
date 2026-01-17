@@ -1267,61 +1267,65 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
         }
       }}
     >
-      <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-8 max-h-[90vh] overflow-y-auto smooth-scroll modal-content">
+      <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 sm:p-8 max-h-[85svh] flex flex-col min-h-0 modal-content">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
           {copy.modalTitle}
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
-              {error}
-            </div>
-          )}
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+          <div
+            className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
 
-          {(categoryName === 'restaurant' || categoryName === 'activity') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {categoryName === 'restaurant'
-                  ? 'Trouver via Google Places (restaurant/bar/café)'
-                  : 'Trouver via Google Places (activité)'}
-              </label>
-              <VotePlacesAutocomplete
-                mode={categoryName === 'restaurant' ? 'restaurant' : 'activity'}
-                latitude={latitude}
-                longitude={longitude}
-                placeholder={
-                  categoryName === 'restaurant'
-                    ? 'Rechercher un restaurant, bar ou café...'
-                    : 'Rechercher une activité (musée, parc, attraction...)...'
-                }
-                onSelect={(p) => {
-                  // auto-remplir
-                  if (!title) setTitle(p.name);
-                  if (!address) setAddress(p.address);
-                  setLink(p.url);
-                  if (p.imageUrl) {
-                    setImagePreviewError(false);
-                    setImageUrl(p.imageUrl);
+            {(categoryName === 'restaurant' || categoryName === 'activity') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {categoryName === 'restaurant'
+                    ? 'Trouver via Google Places (restaurant/bar/café)'
+                    : 'Trouver via Google Places (activité)'}
+                </label>
+                <VotePlacesAutocomplete
+                  mode={categoryName === 'restaurant' ? 'restaurant' : 'activity'}
+                  latitude={latitude}
+                  longitude={longitude}
+                  placeholder={
+                    categoryName === 'restaurant'
+                      ? 'Rechercher un restaurant, bar ou café...'
+                      : 'Rechercher une activité (musée, parc, attraction...)...'
                   }
-                }}
-              />
-              <p className="mt-2 text-xs text-gray-500">
-                Astuce: sélectionne un résultat pour remplir automatiquement Titre + Lien Google Maps (et photo si disponible).
-              </p>
-            </div>
-          )}
+                  onSelect={(p) => {
+                    // auto-remplir
+                    if (!title) setTitle(p.name);
+                    if (!address) setAddress(p.address);
+                    setLink(p.url);
+                    if (p.imageUrl) {
+                      setImagePreviewError(false);
+                      setImageUrl(p.imageUrl);
+                    }
+                  }}
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  Astuce: sélectionne un résultat pour remplir automatiquement Titre + Lien Google Maps (et photo si disponible).
+                </p>
+              </div>
+            )}
 
-          {isAccommodation && (
-            <div className="bg-cream border border-cream rounded-lg p-3 text-dark-gray/80 text-sm font-body">
-              <p className="font-semibold mb-1">Info (photos & descriptions)</p>
-              <p>
-                À cause des politiques de confidentialité de Booking/Airbnb et autres plateformes, il n’est pas toujours possible
-                de récupérer automatiquement les photos et descriptions. Si besoin, ajoute des <span className="font-semibold">captures d’écran</span>{' '}
-                via le champ “Photos”.
-              </p>
-            </div>
-          )}
+            {isAccommodation && (
+              <div className="bg-cream border border-cream rounded-lg p-3 text-dark-gray/80 text-sm font-body">
+                <p className="font-semibold mb-1">Info (photos & descriptions)</p>
+                <p>
+                  À cause des politiques de confidentialité de Booking/Airbnb et autres plateformes, il n’est pas toujours possible
+                  de récupérer automatiquement les photos et descriptions. Si besoin, ajoute des <span className="font-semibold">captures d’écran</span>{' '}
+                  via le champ “Photos”.
+                </p>
+              </div>
+            )}
 
           {previewError && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-800 text-sm">
@@ -1500,7 +1504,10 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
             </p>
           </div>
 
-          <div className="flex justify-end space-x-4 pt-4">
+          </div>
+
+          <div className="sticky bottom-0 bg-white pt-4 pb-[max(12px,env(safe-area-inset-bottom))]">
+            <div className="flex justify-end space-x-4">
             <button
               type="button"
               onClick={onClose}
@@ -1515,6 +1522,7 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
             >
               {loading ? 'Ajout...' : 'Ajouter'}
             </button>
+            </div>
           </div>
         </form>
       </div>
