@@ -146,6 +146,22 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
   const mapStages =
     hasDayView && mapDayFilter !== 'all' ? stages.filter((s) => s.day_date === mapDayFilter) : stages;
 
+  const getDayBadgeCount = (dayIso: string) => {
+    const dayStages = stages.filter((s) => s.day_date === dayIso);
+    if (tripType === 'single') {
+      return dayStages.reduce((acc, s) => acc + (Array.isArray(s.points_of_interest) ? s.points_of_interest.length : 0), 0);
+    }
+    return dayStages.length;
+  };
+
+  const getNoDateBadgeCount = () => {
+    const noDateStages = stages.filter((s) => !s.day_date);
+    if (tripType === 'single') {
+      return noDateStages.reduce((acc, s) => acc + (Array.isArray(s.points_of_interest) ? s.points_of_interest.length : 0), 0);
+    }
+    return noDateStages.length;
+  };
+
   // UX: si on a des jours et aucun filtre encore choisi, on se cale automatiquement sur Jour 1
   useEffect(() => {
     if (!hasDayView) return;
@@ -194,8 +210,12 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
       poi
     ];
 
+    // Si on est en vue jour par jour et qu’un jour est sélectionné, on rattache l’activité à ce jour
+    const selectedDay = hasDayView && mapDayFilter !== 'all' && mapDayFilter !== 'no-date' ? mapDayFilter : null;
+
     const { error } = await supabase.rpc('update_stage', {
       p_stage_id: stage.id,
+      p_day_date: selectedDay,
       p_points_of_interest: next
     });
 
@@ -414,7 +434,12 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                           }`}
                           title={formatDayLabel(d, idx)}
                         >
-                          Jour {idx + 1}
+                          <span>Jour {idx + 1}</span>
+                          {getDayBadgeCount(d) > 0 && (
+                            <span className="ml-2 inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-dark-gray/10 text-dark-gray text-xs font-bold tabular-nums">
+                              {getDayBadgeCount(d)}
+                            </span>
+                          )}
                         </button>
                       ))}
                       {withoutDate.length > 0 && (
@@ -428,7 +453,12 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                           }`}
                           title="Étapes sans date"
                         >
-                          Sans date
+                          <span>Sans date</span>
+                          {getNoDateBadgeCount() > 0 && (
+                            <span className="ml-2 inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-dark-gray/10 text-dark-gray text-xs font-bold tabular-nums">
+                              {getNoDateBadgeCount()}
+                            </span>
+                          )}
                         </button>
                       )}
                     </div>
@@ -514,9 +544,31 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                           }`}
                           title={formatDayLabel(d, idx)}
                         >
-                          Jour {idx + 1}
+                          <span>Jour {idx + 1}</span>
+                          {getDayBadgeCount(d) > 0 && (
+                            <span className="ml-2 inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-white/20 text-white text-xs font-bold tabular-nums">
+                              {getDayBadgeCount(d)}
+                            </span>
+                          )}
                         </button>
                       ))}
+                      {getNoDateBadgeCount() > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setMapDayFilter('no-date')}
+                          className={`shrink-0 px-3 py-2 rounded-button text-sm font-body font-semibold border transition-colors ${
+                            mapDayFilter === 'no-date'
+                              ? 'bg-turquoise text-white border-turquoise'
+                              : 'bg-white text-dark-gray border-cream hover:bg-cream'
+                          }`}
+                          title="Étapes/activités sans date"
+                        >
+                          <span>Sans date</span>
+                          <span className="ml-2 inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-white/20 text-white text-xs font-bold tabular-nums">
+                            {getNoDateBadgeCount()}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
