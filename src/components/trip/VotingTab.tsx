@@ -721,7 +721,24 @@ export function VotingTab({ tripId }: VotingTabProps) {
                   }
 
                   return (
-                    <div className="relative w-full aspect-[4/3] bg-cream">
+                    <div
+                      className="relative w-full aspect-[4/3] bg-cream"
+                      // Tap/clic sur l’image pour défiler les photos (sans déclencher le swipe de vote)
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        if (imgs.length <= 1) return;
+                        // tap gauche = précédente, tap droite = suivante
+                        const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                        const x = (e as any).clientX ?? rect.left + rect.width / 2;
+                        const isLeft = x - rect.left < rect.width / 2;
+                        setSwipePhotoFailed(false);
+                        setSwipePhotoIndex((i) => {
+                          if (isLeft) return Math.max(0, i - 1);
+                          return Math.min(imgs.length - 1, i + 1);
+                        });
+                      }}
+                    >
                       {!swipePhotoFailed ? (
                         <img
                           src={current}
@@ -740,6 +757,9 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
                       {imgs.length > 1 && (
                         <>
+                          <div className="absolute bottom-2 left-2 z-10 px-2 py-1 rounded-full bg-black/40 text-white text-xs font-heading font-semibold pointer-events-none">
+                            {swipePhotoIndex + 1}/{imgs.length}
+                          </div>
                           <button
                             type="button"
                             className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/45 text-white text-lg flex items-center justify-center"
