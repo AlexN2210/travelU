@@ -91,6 +91,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
   const [loading, setLoading] = useState(true);
   const [showAddOption, setShowAddOption] = useState(false);
   const [editingOption, setEditingOption] = useState<VoteOption | null>(null);
+  const [gallery, setGallery] = useState<{ option: VoteOption; index: number } | null>(null);
   const [swipeIndex, setSwipeIndex] = useState(0);
   const [swipeDx, setSwipeDx] = useState(0);
   const [isCoarsePointer, setIsCoarsePointer] = useState(false);
@@ -126,6 +127,10 @@ export function VotingTab({ tripId }: VotingTabProps) {
   useEffect(() => {
     loadCategories();
   }, [tripId]);
+
+  const canEditOption = (o: VoteOption) => {
+    return Boolean(user?.id && o?.added_by && o.added_by === user.id);
+  };
 
   // Charger un point de référence (destination) pour biaiser Google Places sur la bonne zone
   useEffect(() => {
@@ -328,13 +333,19 @@ export function VotingTab({ tripId }: VotingTabProps) {
     // 1) Tentative via RPC (anti N+1)
     const { data, error } = await supabase.rpc('get_vote_options_with_counts', { p_category_id: categoryId });
     if (!error && data && Array.isArray(data)) {
-      setOptions(
-        data.map((o: any) => ({
-          ...o,
-          userVote: o.user_vote ?? null
-        }))
-      );
-      return;
+      // IMPORTANT: si la DB n’a pas les dernières migrations RPC, il se peut que la fonction
+      // ne retourne pas photo_urls -> on tombe alors sur “seulement la 1ère photo”.
+      const hasPhotoUrls = data.some((o: any) => Object.prototype.hasOwnProperty.call(o, 'photo_urls'));
+      if (hasPhotoUrls) {
+        setOptions(
+          data.map((o: any) => ({
+            ...o,
+            userVote: o.user_vote ?? null
+          }))
+        );
+        return;
+      }
+      console.warn('RPC get_vote_options_with_counts ne retourne pas photo_urls; fallback select(*)');
     }
 
     if (error) {
@@ -711,10 +722,10 @@ export function VotingTab({ tripId }: VotingTabProps) {
                 className="bg-white rounded-2xl shadow-medium overflow-hidden select-none"
                 style={{ touchAction: 'pan-y' }}
               >
-                {user?.id === currentSwipeOption?.added_by && (
+                {canEditOption(currentSwipeOption) && (
                   <button
                     type="button"
-                    className="absolute top-3 left-3 z-20 w-10 h-10 rounded-full bg-white/90 text-dark-gray shadow-soft flex items-center justify-center"
+                    className="absolute top-3 left-3 z-30 w-10 h-10 rounded-full bg-white/90 text-dark-gray shadow-soft flex items-center justify-center"
                     onPointerDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
                     onClick={() => setEditingOption(currentSwipeOption)}
@@ -967,14 +978,45 @@ export function VotingTab({ tripId }: VotingTabProps) {
           {rankedOptions.map((option) => {
             const score = (option.upvotes || 0) - (option.downvotes || 0);
             const primaryImg = getOptionPrimaryImage(option);
+            const imgs = getOptionImages(option);
             return (
-              <div key={option.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div key={option.id} className="bg-white rounded-2xl shadow-sm overflow-hidden relative">
                 {primaryImg ? (
                   <div className="w-full aspect-[16/9] bg-cream">
                     <VoteOptionImage src={primaryImg} alt={option.title} />
                   </div>
                 ) : null}
                 <div className="p-4">
+                  {canEditOption(option) && (
+                    <button
+                      type="button"
+                      className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 text-dark-gray shadow-soft flex items-center justify-center"
+                      onClick={() => setEditingOption(option)}
+                      aria-label="Modifier"
+                      title="Modifier"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+                  {imgs.length > 1 && (
+                    <div className="mb-3">
+                      <div className="flex gap-2 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
+                        {imgs.map((u, idx) => (
+                          <button
+                            key={`${u}-${idx}`}
+                            type="button"
+                            onClick={() => setGallery({ option, index: idx })}
+                            className="shrink-0"
+                            aria-label={`Voir photo ${idx + 1}`}
+                            title="Ouvrir la galerie"
+                          >
+                            <img src={u} alt={`Photo ${idx + 1}`} className="w-16 h-16 object-cover rounded-lg border border-cream" />
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-xs text-dark-gray/60 font-body">Tap sur une photo pour ouvrir la galerie.</p>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="font-heading font-bold text-dark-gray break-words">{option.title}</h3>
@@ -1032,11 +1074,41 @@ export function VotingTab({ tripId }: VotingTabProps) {
             // const totalVotes = option.upvotes + option.downvotes; // Non utilisé pour l'instant
             const score = option.upvotes - option.downvotes;
             const primaryImg = getOptionPrimaryImage(option);
+            const imgs = getOptionImages(option);
 
             return (
-              <div key={option.id} className="bg-white rounded-lg shadow-sm p-6">
+              <div key={option.id} className="bg-white rounded-lg shadow-sm p-6 relative">
+                {canEditOption(option) && (
+                  <button
+                    type="button"
+                    className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 text-dark-gray shadow-soft flex items-center justify-center"
+                    onClick={() => setEditingOption(option)}
+                    aria-label="Modifier"
+                    title="Modifier"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
                 {primaryImg && (
                   <VoteOptionImage src={primaryImg} alt={option.title} />
+                )}
+                {imgs.length > 1 && (
+                  <div className="mb-4 -mt-2">
+                    <div className="flex gap-2 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      {imgs.map((u, idx) => (
+                        <button
+                          key={`${u}-${idx}`}
+                          type="button"
+                          onClick={() => setGallery({ option, index: idx })}
+                          className="shrink-0"
+                          aria-label={`Voir photo ${idx + 1}`}
+                          title="Ouvrir la galerie"
+                        >
+                          <img src={u} alt={`Photo ${idx + 1}`} className="w-16 h-16 object-cover rounded-lg border border-cream" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {option.title}
@@ -1139,6 +1211,111 @@ export function VotingTab({ tripId }: VotingTabProps) {
           }}
         />
       )}
+
+      {gallery && (
+        <PhotoGalleryModal
+          title={gallery.option.title}
+          images={getOptionImages(gallery.option)}
+          index={gallery.index}
+          onClose={() => setGallery(null)}
+          onChange={(next) => setGallery((g) => (g ? { ...g, index: next } : g))}
+        />
+      )}
+    </div>
+  );
+}
+
+function PhotoGalleryModal({
+  title,
+  images,
+  index,
+  onClose,
+  onChange
+}: {
+  title: string;
+  images: string[];
+  index: number;
+  onClose: () => void;
+  onChange: (idx: number) => void;
+}) {
+  const safeImages = Array.isArray(images) ? images.filter(Boolean) : [];
+  const i = Math.max(0, Math.min(index, Math.max(0, safeImages.length - 1)));
+  const current = safeImages[i];
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[60]"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-white rounded-2xl shadow-medium w-full max-w-lg overflow-hidden">
+        <div className="flex items-center justify-between gap-3 p-4 border-b border-cream">
+          <div className="min-w-0">
+            <p className="font-heading font-bold text-dark-gray truncate">{title}</p>
+            <p className="text-xs text-dark-gray/60 font-body">
+              {safeImages.length > 0 ? `${i + 1}/${safeImages.length}` : '—'}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="w-10 h-10 rounded-full bg-cream text-dark-gray flex items-center justify-center"
+            onClick={onClose}
+            aria-label="Fermer"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="relative bg-black">
+          {current ? (
+            <img src={current} alt={title} className="w-full h-[60vh] object-contain" />
+          ) : (
+            <div className="w-full h-[40vh] flex items-center justify-center bg-black text-white/70">
+              Aucune image
+            </div>
+          )}
+
+          {safeImages.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 text-white text-xl"
+                onClick={() => onChange(Math.max(0, i - 1))}
+                aria-label="Précédente"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 text-white text-xl"
+                onClick={() => onChange(Math.min(safeImages.length - 1, i + 1))}
+                aria-label="Suivante"
+              >
+                ›
+              </button>
+            </>
+          )}
+        </div>
+
+        {safeImages.length > 1 && (
+          <div className="p-3 border-t border-cream overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex gap-2">
+              {safeImages.map((u, idx) => (
+                <button
+                  key={`${u}-${idx}`}
+                  type="button"
+                  className={`shrink-0 rounded-lg overflow-hidden border ${idx === i ? 'border-turquoise' : 'border-cream'}`}
+                  onClick={() => onChange(idx)}
+                  aria-label={`Voir photo ${idx + 1}`}
+                >
+                  <img src={u} alt={`Miniature ${idx + 1}`} className="w-16 h-16 object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
