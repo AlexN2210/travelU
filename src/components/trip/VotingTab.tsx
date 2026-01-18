@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, ThumbsUp, ThumbsDown, ExternalLink } from 'lucide-react';
+import { Plus, ThumbsUp, ThumbsDown, ExternalLink, Pencil } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { VotePlacesAutocomplete } from '../VotePlacesAutocomplete';
@@ -70,6 +70,19 @@ function getPlatformLabel(url: string) {
   }
 }
 
+function extractEuroAmount(text?: string | null) {
+  if (!text) return null;
+  // Ex: "à partir de 25€", "25 €", "EUR 25", "25,50€"
+  const t = String(text);
+  const m =
+    t.match(/(\d{1,6}(?:[.,]\d{1,2})?)\s*€/) ||
+    t.match(/€\s*(\d{1,6}(?:[.,]\d{1,2})?)/) ||
+    t.match(/(?:EUR|€)\s*(\d{1,6}(?:[.,]\d{1,2})?)/i) ||
+    t.match(/(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:EUR|eur)\b/i);
+  if (!m) return null;
+  return m[1]?.replace(',', '.') || null;
+}
+
 export function VotingTab({ tripId }: VotingTabProps) {
   const { user } = useAuth();
   const [categories, setCategories] = useState<VoteCategory[]>([]);
@@ -77,6 +90,7 @@ export function VotingTab({ tripId }: VotingTabProps) {
   const [options, setOptions] = useState<VoteOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddOption, setShowAddOption] = useState(false);
+  const [editingOption, setEditingOption] = useState<VoteOption | null>(null);
   const [swipeIndex, setSwipeIndex] = useState(0);
   const [swipeDx, setSwipeDx] = useState(0);
   const [isCoarsePointer, setIsCoarsePointer] = useState(false);
@@ -378,6 +392,14 @@ export function VotingTab({ tripId }: VotingTabProps) {
     }
     // dédoublonnage simple
     return Array.from(new Set(urls));
+  };
+
+  const formatPriceDisplay = (price?: string | null) => {
+    if (!price) return '';
+    const p = String(price).trim();
+    if (!p) return '';
+    if (p.includes('€')) return p;
+    return `${p} €`;
   };
 
   const parsePriceToNumber = (price?: string | null) => {
@@ -689,6 +711,19 @@ export function VotingTab({ tripId }: VotingTabProps) {
                 className="bg-white rounded-2xl shadow-medium overflow-hidden select-none"
                 style={{ touchAction: 'pan-y' }}
               >
+                {user?.id === currentSwipeOption?.added_by && (
+                  <button
+                    type="button"
+                    className="absolute top-3 left-3 z-20 w-10 h-10 rounded-full bg-white/90 text-dark-gray shadow-soft flex items-center justify-center"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={() => setEditingOption(currentSwipeOption)}
+                    aria-label="Modifier"
+                    title="Modifier"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
                 {/* Overlays swipe */}
                 <div className="absolute top-4 left-4 z-10 pointer-events-none">
                   {swipeDx > 35 && (
@@ -835,7 +870,8 @@ export function VotingTab({ tripId }: VotingTabProps) {
                       )}
                       {currentSwipeOption.price && (
                         <p className="text-dark-gray/80 text-sm font-body font-semibold break-words">
-                          {currentSwipeOption.price}
+                          {formatPriceDisplay(currentSwipeOption.price)}
+                          {selectedCategoryName === 'activity' ? ' / pers' : ''}
                         </p>
                       )}
                     </div>
@@ -948,7 +984,10 @@ export function VotingTab({ tripId }: VotingTabProps) {
                             <p className="text-sm text-dark-gray/70 break-words">{option.address}</p>
                           )}
                           {option.price && (
-                            <p className="text-sm text-dark-gray/80 font-semibold break-words">{option.price}</p>
+                            <p className="text-sm text-dark-gray/80 font-semibold break-words">
+                              {formatPriceDisplay(option.price)}
+                              {selectedCategoryName === 'activity' ? ' / pers' : ''}
+                            </p>
                           )}
                         </div>
                       )}
@@ -1006,7 +1045,12 @@ export function VotingTab({ tripId }: VotingTabProps) {
                 {(option.address || option.price) && (
                   <div className="mb-3 space-y-1">
                     {option.address && <p className="text-gray-600 text-sm break-words">{option.address}</p>}
-                    {option.price && <p className="text-gray-800 text-sm font-semibold break-words">{option.price}</p>}
+                    {option.price && (
+                      <p className="text-gray-800 text-sm font-semibold break-words">
+                        {formatPriceDisplay(option.price)}
+                        {selectedCategoryName === 'activity' ? ' / pers' : ''}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -1073,12 +1117,25 @@ export function VotingTab({ tripId }: VotingTabProps) {
           categoryTitle={categories.find(c => c.id === selectedCategory)?.title}
           latitude={tripLocation?.lat}
           longitude={tripLocation?.lng}
+          existingOptions={options}
           onClose={() => setShowAddOption(false)}
           onSuccess={() => {
             setShowAddOption(false);
             if (selectedCategory) {
               loadOptions(selectedCategory);
             }
+          }}
+        />
+      )}
+
+      {editingOption && (
+        <EditOptionModal
+          tripId={tripId}
+          option={editingOption}
+          onClose={() => setEditingOption(null)}
+          onSuccess={() => {
+            setEditingOption(null);
+            if (selectedCategory) loadOptions(selectedCategory);
           }}
         />
       )}
@@ -1093,6 +1150,7 @@ interface AddOptionModalProps {
   categoryTitle?: string;
   latitude?: number;
   longitude?: number;
+  existingOptions?: VoteOption[];
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -1145,7 +1203,7 @@ function getCategoryCopy(categoryName?: string, categoryTitle?: string) {
   }
 }
 
-function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latitude, longitude, onClose, onSuccess }: AddOptionModalProps) {
+function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latitude, longitude, existingOptions, onClose, onSuccess }: AddOptionModalProps) {
   const { user } = useAuth();
   const copy = getCategoryCopy(categoryName, categoryTitle);
   const [title, setTitle] = useState('');
@@ -1164,6 +1222,21 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
 
   const isAccommodation = categoryName === 'accommodation';
+
+  const normalize = (s?: string | null) => (s || '').trim().toLowerCase();
+
+  const isDuplicate = () => {
+    const t = normalize(title);
+    const l = normalize(link);
+    const list = Array.isArray(existingOptions) ? existingOptions : [];
+    return list.some((o) => {
+      const ot = normalize(o.title);
+      const ol = normalize(o.link || '');
+      if (t && ot === t) return true;
+      if (l && ol && ol === l) return true;
+      return false;
+    });
+  };
 
   const safeRandomId = () => {
     try {
@@ -1221,6 +1294,11 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
           setImagePreviewError(false);
           setImageUrl(data.image);
         }
+        // Activités: tenter d'extraire un tarif / pers depuis le texte si disponible
+        if (categoryName === 'activity' && !price) {
+          const p = extractEuroAmount(data?.description) || extractEuroAmount(data?.title);
+          if (p) setPrice(p);
+        }
         if (!data.image && !data.description && !data.title) {
           setPreviewError(
             categoryName === 'accommodation'
@@ -1239,6 +1317,12 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (isDuplicate()) {
+      setError('Option déjà existante (même titre ou même lien).');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -1414,15 +1498,27 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Prix (optionnel)
+              {categoryName === 'activity' ? 'Tarif / personne (optionnel)' : 'Prix (optionnel)'}
             </label>
-            <input
-              type="text"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder={isAccommodation ? 'Ex: 1200 € (prix total du séjour, tout inclus)' : 'Ex: 25€/pers'}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full pr-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder={
+                  categoryName === 'activity'
+                    ? 'Ex: 25 (par personne)'
+                    : isAccommodation
+                      ? 'Ex: 1200 (prix total du séjour)'
+                      : 'Ex: 25'
+                }
+                inputMode="decimal"
+              />
+              <div className="absolute inset-y-0 right-3 flex items-center text-gray-500 font-semibold pointer-events-none">
+                €
+              </div>
+            </div>
           </div>
 
           <div>
@@ -1574,6 +1670,295 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
             >
               {loading ? 'Ajout...' : 'Ajouter'}
             </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface EditOptionModalProps {
+  tripId: string;
+  option: VoteOption;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function EditOptionModal({ tripId, option, onClose, onSuccess }: EditOptionModalProps) {
+  const { user } = useAuth();
+  const [title, setTitle] = useState(option.title || '');
+  const [description, setDescription] = useState(option.description || '');
+  const [address, setAddress] = useState(option.address || '');
+  const [price, setPrice] = useState(option.price || '');
+  const [link, setLink] = useState(option.link || '');
+  const [imageUrl, setImageUrl] = useState(option.image_url || '');
+
+  const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>(
+    Array.isArray(option.photo_urls) ? option.photo_urls.filter(Boolean) : []
+  );
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const safeRandomId = () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c: any = globalThis.crypto;
+      if (c?.randomUUID) return c.randomUUID();
+    } catch {
+      // ignore
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
+
+  const uploadPhotos = async (): Promise<string[]> => {
+    if (!user) throw new Error('Utilisateur non authentifié');
+    if (photoFiles.length === 0) return [];
+
+    const bucket = supabase.storage.from('vote-option-photos');
+    const urls: string[] = [];
+
+    for (const file of photoFiles) {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const path = `trips/${tripId}/vote-options/${option.id}/${user.id}/${safeRandomId()}.${ext}`;
+      const { error: upErr } = await bucket.upload(path, file, {
+        upsert: false,
+        contentType: file.type || 'image/jpeg',
+        cacheControl: '3600'
+      });
+      if (upErr) throw new Error(upErr.message || 'Erreur upload photo');
+      const { data } = bucket.getPublicUrl(path);
+      if (data?.publicUrl) urls.push(data.publicUrl);
+    }
+
+    return urls;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const uploaded = await uploadPhotos();
+      const mergedPhotoUrls = [...existingPhotoUrls, ...uploaded];
+      const finalImageUrl = imageUrl || mergedPhotoUrls[0] || null;
+
+      const { error: updErr } = await supabase.rpc('update_vote_option', {
+        p_option_id: option.id,
+        p_title: title,
+        p_description: description || null,
+        p_link: link || null,
+        p_image_url: finalImageUrl,
+        p_address: address || null,
+        p_price: price || null,
+        p_photo_urls: mergedPhotoUrls
+      });
+
+      if (updErr) {
+        console.error('Erreur update option vote (RPC):', updErr);
+        // fallback direct (peut être bloqué par RLS)
+        const { error: fbErr } = await supabase
+          .from('vote_options')
+          .update({
+            title,
+            description: description || null,
+            link: link || null,
+            image_url: finalImageUrl,
+            address: address || null,
+            price: price || null,
+            photo_urls: mergedPhotoUrls
+          })
+          .eq('id', option.id);
+        if (fbErr) {
+          setError(fbErr.message || updErr.message || 'Erreur lors de la mise à jour');
+          setLoading(false);
+          return;
+        }
+      }
+
+      setLoading(false);
+      onSuccess();
+    } catch (e: any) {
+      setError(e?.message || 'Erreur lors de la mise à jour');
+      setLoading(false);
+    }
+  };
+
+  // Bloque le scroll du body quand la modale est ouverte
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
+  // Cleanup previews
+  useEffect(() => {
+    return () => {
+      photoPreviews.forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {
+          // ignore
+        }
+      });
+    };
+  }, [photoPreviews]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 modal-overlay backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-white rounded-2xl shadow-medium max-w-md w-full p-6 sm:p-8 max-h-[85svh] flex flex-col min-h-0 modal-content">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Modifier l’option</h2>
+
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+          <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1" style={{ WebkitOverflowScrolling: 'touch' }}>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Titre *</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Adresse (optionnel)</label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Prix (optionnel)</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="w-full pr-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  inputMode="decimal"
+                />
+                <div className="absolute inset-y-0 right-3 flex items-center text-gray-500 font-semibold pointer-events-none">
+                  €
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Description (optionnel)</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Lien (optionnel)</label>
+              <input
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Image principale (URL) (optionnel)</label>
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="https://.../photo.jpg"
+              />
+            </div>
+
+            {existingPhotoUrls.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Photos actuelles</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {existingPhotoUrls.map((u, idx) => (
+                    <div key={`${u}-${idx}`} className="relative">
+                      <img src={u} alt={`Photo ${idx + 1}`} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setExistingPhotoUrls((arr) => arr.filter((_, i) => i !== idx))}
+                        className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center"
+                        aria-label="Supprimer la photo"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ajouter des photos (optionnel)</label>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  setPhotoFiles(files);
+                  const urls = files.map((f) => URL.createObjectURL(f));
+                  photoPreviews.forEach((u) => {
+                    try {
+                      URL.revokeObjectURL(u);
+                    } catch {
+                      // ignore
+                    }
+                  });
+                  setPhotoPreviews(urls);
+                }}
+                className="w-full text-sm"
+              />
+              {photoPreviews.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {photoPreviews.map((u, idx) => (
+                    <img key={`${u}-${idx}`} src={u} alt={`Nouveau ${idx + 1}`} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="sticky bottom-0 bg-white pt-4 pb-[max(12px,env(safe-area-inset-bottom))]">
+            <div className="flex justify-end space-x-4">
+              <button type="button" onClick={onClose} className="px-6 py-2 text-gray-700 hover:text-gray-900 font-medium">
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
             </div>
           </div>
         </form>
