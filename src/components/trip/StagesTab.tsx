@@ -50,12 +50,28 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
   useEffect(() => {
     const loadTripDates = async () => {
       try {
+        // 1) RPC fiable (bypass RLS) si disponible
+        const { data: meta, error: metaErr } = await supabase.rpc('get_trip_meta', { p_trip_id: tripId });
+        if (!metaErr && Array.isArray(meta) && meta[0]) {
+          const m: any = meta[0];
+          setTripDates({ start_date: m.start_date ?? null, end_date: m.end_date ?? null });
+          return;
+        }
+
+        if (metaErr) {
+          console.warn('Étapes: get_trip_meta indisponible (fallback client):', metaErr);
+        }
+
+        // 2) Fallback client (peut être bloqué par RLS selon les policies)
         const { data, error } = await supabase
           .from('trips')
           .select('start_date,end_date')
           .eq('id', tripId)
           .maybeSingle();
-        if (error || !data) return;
+        if (error || !data) {
+          if (error) console.warn('Étapes: impossible de charger trips.start_date/end_date:', error);
+          return;
+        }
         setTripDates({ start_date: data.start_date ?? null, end_date: data.end_date ?? null });
       } catch (e) {
         console.warn('Impossible de charger les dates du voyage:', e);
@@ -125,7 +141,8 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
   };
 
   const tripDays = getTripDays();
-  const hasDayView = tripType === 'roadtrip' && tripDays.length > 0;
+  // Jour par jour: activé aussi pour les voyages "single" (planning du séjour)
+  const hasDayView = tripDays.length > 0;
   const mapStages =
     hasDayView && mapDayFilter !== 'all' ? stages.filter((s) => s.day_date === mapDayFilter) : stages;
 
@@ -199,13 +216,19 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
         </h2>
         <button
           onClick={() => {
-            setAddStageDayDate(null);
+            // Si on est en vue jour par jour, on pré-sélectionne le jour courant (filtre carte) ou le 1er jour
+            if (hasDayView) {
+              const defaultDay = mapDayFilter !== 'all' ? mapDayFilter : tripDays[0] || null;
+              setAddStageDayDate(defaultDay);
+            } else {
+              setAddStageDayDate(null);
+            }
             setShowAddStage(true);
           }}
           className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
         >
           <Plus className="w-5 h-5" />
-          <span>{tripType === 'roadtrip' ? 'Ajouter une étape' : 'Ajout d\'une activité'}</span>
+          <span>{tripType === 'roadtrip' ? 'Ajouter une étape' : hasDayView ? 'Ajouter (jour)' : 'Ajout d\'une activité'}</span>
         </button>
       </div>
 
@@ -230,7 +253,7 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
           <div className="space-y-4 w-full min-w-0">
             {(() => {
               const days = getTripDays();
-              const hasDayView = tripType === 'roadtrip' && days.length > 0;
+              const hasDayView = days.length > 0;
               const sorted = [...stages].sort((a, b) => {
                 const ad = a.day_date || '';
                 const bd = b.day_date || '';
@@ -350,7 +373,7 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                 return sorted.map((stage, i) => renderStageCard(stage, i + 1));
               }
 
-              // Jour par jour (roadtrip)
+              // Jour par jour (roadtrip + single)
               const withoutDate = sorted.filter((s) => !s.day_date);
               return (
                 <div className="space-y-6">
@@ -469,11 +492,22 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
       )}
 
       {showAddStage && (
+        (() => {
+          // Pour "single": on cible l'étape du jour (si déjà existante) pour ajouter des activités dans CE jour.
+          // Cas legacy: si une seule étape existe sans date, on la réutilise comme "jour sélectionné".
+          const wantedDay = addStageDayDate;
+          const singleExisting =
+            tripType === 'single'
+              ? stages.find((s) => wantedDay && s.day_date === wantedDay) ||
+                ((wantedDay && stages.length === 1 && !stages[0].day_date) ? stages[0] : null)
+              : null;
+
+          return (
         <AddStageModal
           tripId={tripId}
           tripType={tripType}
           orderIndex={stages.length}
-          existingStage={tripType === 'single' && stages.length > 0 ? stages[0] : null}
+          existingStage={singleExisting}
           tripStartDate={tripDates?.start_date || null}
           tripEndDate={tripDates?.end_date || null}
           defaultDayDate={addStageDayDate}
@@ -484,6 +518,8 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
             loadStages();
           }}
         />
+          );
+        })()
       )}
     </div>
   );
