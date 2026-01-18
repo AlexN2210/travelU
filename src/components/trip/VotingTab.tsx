@@ -723,21 +723,6 @@ export function VotingTab({ tripId }: VotingTabProps) {
                   return (
                     <div
                       className="relative w-full aspect-[4/3] bg-cream"
-                      // Tap/clic sur l’image pour défiler les photos (sans déclencher le swipe de vote)
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        if (imgs.length <= 1) return;
-                        // tap gauche = précédente, tap droite = suivante
-                        const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-                        const x = (e as any).clientX ?? rect.left + rect.width / 2;
-                        const isLeft = x - rect.left < rect.width / 2;
-                        setSwipePhotoFailed(false);
-                        setSwipePhotoIndex((i) => {
-                          if (isLeft) return Math.max(0, i - 1);
-                          return Math.min(imgs.length - 1, i + 1);
-                        });
-                      }}
                     >
                       {!swipePhotoFailed ? (
                         <img
@@ -760,11 +745,40 @@ export function VotingTab({ tripId }: VotingTabProps) {
                           <div className="absolute bottom-2 left-2 z-10 px-2 py-1 rounded-full bg-black/40 text-white text-xs font-heading font-semibold pointer-events-none">
                             {swipePhotoIndex + 1}/{imgs.length}
                           </div>
+
+                          {/* Zones tap/clic (gauche/droite) pour défiler, plus fiables que click/touchend sur mobile */}
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 left-0 w-1/2 bg-transparent"
+                            aria-label="Photo précédente (taper à gauche)"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onPointerUp={(e) => {
+                              e.stopPropagation();
+                              setSwipePhotoFailed(false);
+                              setSwipePhotoIndex((i) => Math.max(0, i - 1));
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 w-1/2 bg-transparent"
+                            aria-label="Photo suivante (taper à droite)"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onPointerUp={(e) => {
+                              e.stopPropagation();
+                              setSwipePhotoFailed(false);
+                              setSwipePhotoIndex((i) => Math.min(imgs.length - 1, i + 1));
+                            }}
+                          />
                           <button
                             type="button"
                             className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/45 text-white text-lg flex items-center justify-center"
                             onPointerDown={(e) => e.stopPropagation()}
                             onTouchStart={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => {
+                              e.stopPropagation();
+                              setSwipePhotoFailed(false);
+                              setSwipePhotoIndex((i) => Math.max(0, i - 1));
+                            }}
                             onClick={() => {
                               setSwipePhotoFailed(false);
                               setSwipePhotoIndex((i) => Math.max(0, i - 1));
@@ -778,6 +792,11 @@ export function VotingTab({ tripId }: VotingTabProps) {
                             className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/45 text-white text-lg flex items-center justify-center"
                             onPointerDown={(e) => e.stopPropagation()}
                             onTouchStart={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => {
+                              e.stopPropagation();
+                              setSwipePhotoFailed(false);
+                              setSwipePhotoIndex((i) => Math.min(imgs.length - 1, i + 1));
+                            }}
                             onClick={() => {
                               setSwipePhotoFailed(false);
                               setSwipePhotoIndex((i) => Math.min(imgs.length - 1, i + 1));
