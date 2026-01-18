@@ -146,6 +146,14 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
   const mapStages =
     hasDayView && mapDayFilter !== 'all' ? stages.filter((s) => s.day_date === mapDayFilter) : stages;
 
+  // UX: si on a des jours et aucun filtre encore choisi, on se cale automatiquement sur Jour 1
+  useEffect(() => {
+    if (!hasDayView) return;
+    if (mapDayFilter !== 'all') return;
+    if (tripDays.length === 0) return;
+    setMapDayFilter(tripDays[0]);
+  }, [hasDayView, mapDayFilter, tripDays]);
+
   const handleDeleteStage = async (stageId: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette étape ?')) return;
 
@@ -373,62 +381,102 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                 return sorted.map((stage, i) => renderStageCard(stage, i + 1));
               }
 
-              // Jour par jour (roadtrip + single)
+              // Jour par jour: cards horizontales + contenu filtré
+              const selectedDay = mapDayFilter; // on réutilise le même filtre que la carte
               const withoutDate = sorted.filter((s) => !s.day_date);
-              return (
-                <div className="space-y-6">
-                  {days.map((dayIso, dayIdx) => {
-                    const items = sorted.filter((s) => s.day_date === dayIso);
-                    return (
-                      <div key={dayIso} className="space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <h3 className="text-base sm:text-lg font-semibold text-dark-gray">
-                            {formatDayLabel(dayIso, dayIdx)}
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAddStageDayDate(dayIso);
-                              setShowAddStage(true);
-                            }}
-                            className="flex items-center space-x-2 px-3 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-soft"
-                          >
-                            <Plus className="w-4 h-4" />
-                            <span>Ajouter</span>
-                          </button>
-                        </div>
-                        {items.length === 0 ? (
-                          <div className="bg-cream rounded-lg p-4 text-sm text-dark-gray/70 font-body">
-                            Aucune étape pour ce jour.
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {items.map((stage, idx) => renderStageCard(stage, idx + 1))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+              const itemsForSelectedDay =
+                selectedDay === 'all' ? sorted.filter((s) => !!s.day_date) : sorted.filter((s) => s.day_date === selectedDay);
 
-                  {withoutDate.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-base sm:text-lg font-semibold text-dark-gray">Sans date</h3>
+              return (
+                <div className="space-y-4">
+                  <div className="-mx-1">
+                    <div className="flex items-center gap-2 overflow-x-auto px-1 pb-1" style={{ WebkitOverflowScrolling: 'touch' as any }}>
+                      <button
+                        type="button"
+                        onClick={() => setMapDayFilter('all')}
+                        className={`shrink-0 px-3 py-2 rounded-button text-sm font-body font-semibold border transition-colors ${
+                          selectedDay === 'all'
+                            ? 'bg-dark-gray text-white border-dark-gray'
+                            : 'bg-white text-dark-gray border-cream hover:bg-cream'
+                        }`}
+                      >
+                        Tous
+                      </button>
+                      {days.map((d, idx) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setMapDayFilter(d)}
+                          className={`shrink-0 px-3 py-2 rounded-button text-sm font-body font-semibold border transition-colors ${
+                            selectedDay === d
+                              ? 'bg-turquoise text-white border-turquoise'
+                              : 'bg-white text-dark-gray border-cream hover:bg-cream'
+                          }`}
+                          title={formatDayLabel(d, idx)}
+                        >
+                          Jour {idx + 1}
+                        </button>
+                      ))}
+                      {withoutDate.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setAddStageDayDate(null);
-                            setShowAddStage(true);
-                          }}
-                          className="flex items-center space-x-2 px-3 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-soft"
+                          onClick={() => setMapDayFilter('no-date')}
+                          className={`shrink-0 px-3 py-2 rounded-button text-sm font-body font-semibold border transition-colors ${
+                            selectedDay === 'no-date'
+                              ? 'bg-turquoise text-white border-turquoise'
+                              : 'bg-white text-dark-gray border-cream hover:bg-cream'
+                          }`}
+                          title="Étapes sans date"
                         >
-                          <Plus className="w-4 h-4" />
-                          <span>Ajouter</span>
+                          Sans date
                         </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      {selectedDay === 'all' ? (
+                        <h3 className="text-base sm:text-lg font-semibold text-dark-gray">Tous les jours</h3>
+                      ) : selectedDay === 'no-date' ? (
+                        <h3 className="text-base sm:text-lg font-semibold text-dark-gray">Sans date</h3>
+                      ) : (
+                        <h3 className="text-base sm:text-lg font-semibold text-dark-gray">
+                          {formatDayLabel(selectedDay, days.indexOf(selectedDay))}
+                        </h3>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = selectedDay === 'no-date' || selectedDay === 'all' ? null : selectedDay;
+                        setAddStageDayDate(d);
+                        setShowAddStage(true);
+                      }}
+                      className="flex items-center space-x-2 px-3 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-soft"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Ajouter</span>
+                    </button>
+                  </div>
+
+                  {selectedDay === 'no-date' ? (
+                    withoutDate.length === 0 ? (
+                      <div className="bg-cream rounded-lg p-4 text-sm text-dark-gray/70 font-body">
+                        Aucune étape sans date.
                       </div>
+                    ) : (
                       <div className="space-y-4">
                         {withoutDate.map((stage, idx) => renderStageCard(stage, idx + 1))}
                       </div>
+                    )
+                  ) : itemsForSelectedDay.length === 0 ? (
+                    <div className="bg-cream rounded-lg p-4 text-sm text-dark-gray/70 font-body">
+                      Aucune étape pour ce jour.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {itemsForSelectedDay.map((stage, idx) => renderStageCard(stage, idx + 1))}
                     </div>
                   )}
                 </div>
