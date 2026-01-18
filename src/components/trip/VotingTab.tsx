@@ -1394,6 +1394,7 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
   const [previewError, setPreviewError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
 
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
@@ -1494,9 +1495,10 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setWarning('');
 
     if (isDuplicate()) {
-      setError('Option déjà existante (même titre ou même lien).');
+      setWarning('Option déjà existante (même titre ou même lien).');
       return;
     }
 
@@ -1593,6 +1595,12 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
                 {error}
+              </div>
+            )}
+
+            {warning && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-800 text-sm">
+                {warning}
               </div>
             )}
 
@@ -1914,6 +1922,49 @@ function EditOptionModal({ tripId, option, onClose, onSuccess }: EditOptionModal
     return urls;
   };
 
+  const extractStoragePath = (publicUrl: string) => {
+    // Ex: https://<project>.supabase.co/storage/v1/object/public/vote-option-photos/<path>
+    const marker = '/storage/v1/object/public/vote-option-photos/';
+    const idx = publicUrl.indexOf(marker);
+    if (idx === -1) return null;
+    return publicUrl.slice(idx + marker.length);
+  };
+
+  const deleteOption = async () => {
+    if (!confirm('Supprimer cette option ? Cette action est définitive.')) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      // Best-effort: supprimer les fichiers Storage référencés
+      const bucket = supabase.storage.from('vote-option-photos');
+      const toRemove = (Array.isArray(existingPhotoUrls) ? existingPhotoUrls : [])
+        .map((u) => (u ? extractStoragePath(u) : null))
+        .filter((p): p is string => Boolean(p));
+      if (toRemove.length > 0) {
+        await bucket.remove(toRemove).catch(() => {});
+      }
+
+      const { error: delErr } = await supabase.rpc('delete_vote_option', { p_option_id: option.id });
+      if (delErr) {
+        console.error('Erreur suppression option vote (RPC):', delErr);
+        // fallback direct (peut être bloqué par RLS)
+        const { error: fbErr } = await supabase.from('vote_options').delete().eq('id', option.id);
+        if (fbErr) {
+          setError(fbErr.message || delErr.message || 'Erreur lors de la suppression');
+          setLoading(false);
+          return;
+        }
+      }
+
+      setLoading(false);
+      onSuccess();
+    } catch (e: any) {
+      setError(e?.message || 'Erreur lors de la suppression');
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -2126,6 +2177,14 @@ function EditOptionModal({ tripId, option, onClose, onSuccess }: EditOptionModal
 
           <div className="sticky bottom-0 bg-white pt-4 pb-[max(12px,env(safe-area-inset-bottom))]">
             <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={deleteOption}
+                disabled={loading}
+                className="px-6 py-2 text-burnt-orange font-semibold rounded-lg hover:bg-burnt-orange/10 transition-colors disabled:opacity-50"
+              >
+                Supprimer
+              </button>
               <button type="button" onClick={onClose} className="px-6 py-2 text-gray-700 hover:text-gray-900 font-medium">
                 Annuler
               </button>
