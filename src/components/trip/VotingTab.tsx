@@ -165,6 +165,34 @@ export function VotingTab({ tripId }: VotingTabProps) {
   useEffect(() => {
     const loadTripMeta = async () => {
       try {
+        // 1) RPC fiable (bypass RLS): dates + nb participants
+        const { data: meta, error: metaErr } = await supabase.rpc('get_trip_meta', { p_trip_id: tripId });
+        if (!metaErr && Array.isArray(meta) && meta[0]) {
+          const m: any = meta[0];
+          const startDate = m.start_date as string | null;
+          const endDate = m.end_date as string | null;
+          const participantsCount = Number(m.participants_count);
+
+          setTripParticipantsCount(Number.isFinite(participantsCount) ? Math.max(1, participantsCount) : 1);
+
+          // IMPORTANT: utiliser UTC pour éviter les décalages timezone/DST
+          const start = startDate ? new Date(`${startDate}T00:00:00Z`) : null;
+          const end = endDate ? new Date(`${endDate}T00:00:00Z`) : null;
+          if (start && end && Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())) {
+            const msPerDay = 1000 * 60 * 60 * 24;
+            const diffDays = Math.round((end.getTime() - start.getTime()) / msPerDay);
+            setTripNights(Math.max(1, diffDays || 1));
+          } else {
+            setTripNights(1);
+          }
+          return;
+        }
+
+        if (metaErr) {
+          console.warn('Votes: get_trip_meta indisponible (fallback client):', metaErr);
+        }
+
+        // 2) Fallback client (ancien comportement)
         const { data: trip, error: tripErr } = await supabase
           .from('trips')
           .select('creator_id,start_date,end_date')
@@ -172,7 +200,6 @@ export function VotingTab({ tripId }: VotingTabProps) {
           .maybeSingle();
         if (tripErr || !trip) return;
 
-        // IMPORTANT: utiliser UTC pour éviter les décalages timezone/DST
         const start = trip.start_date ? new Date(`${trip.start_date}T00:00:00Z`) : null;
         const end = trip.end_date ? new Date(`${trip.end_date}T00:00:00Z`) : null;
         if (start && end && Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())) {
@@ -183,20 +210,6 @@ export function VotingTab({ tripId }: VotingTabProps) {
 
         const creatorId = trip.creator_id as string | null;
 
-        // Participants via RPC (si déployée)
-        const { data: profs, error: profErr } = await supabase.rpc('get_trip_participant_profiles', { p_trip_id: tripId });
-        if (!profErr && Array.isArray(profs)) {
-          const ids = new Set<string>();
-          for (const p of profs) {
-            const uid = (p as any)?.user_id;
-            if (uid) ids.add(String(uid));
-          }
-          if (creatorId) ids.add(creatorId);
-          setTripParticipantsCount(Math.max(1, ids.size || 1));
-          return;
-        }
-
-        // Fallback: trip_participants
         const { data: tps } = await supabase
           .from('trip_participants')
           .select('user_id')

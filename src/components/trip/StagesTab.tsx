@@ -21,6 +21,7 @@ interface Stage {
   trip_id: string;
   name: string;
   order_index: number;
+  day_date?: string | null;
   latitude: number;
   longitude: number;
   accommodation_link: string | null;
@@ -38,10 +39,56 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
   const [stages, setStages] = useState<Stage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddStage, setShowAddStage] = useState(false);
+  const [addStageDayDate, setAddStageDayDate] = useState<string | null>(null);
+  const [tripDates, setTripDates] = useState<{ start_date: string | null; end_date: string | null } | null>(null);
+  const [mapDayFilter, setMapDayFilter] = useState<string>('all'); // 'all' | YYYY-MM-DD
 
   useEffect(() => {
     loadStages();
   }, [tripId]);
+
+  useEffect(() => {
+    const loadTripDates = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('trips')
+          .select('start_date,end_date')
+          .eq('id', tripId)
+          .maybeSingle();
+        if (error || !data) return;
+        setTripDates({ start_date: data.start_date ?? null, end_date: data.end_date ?? null });
+      } catch (e) {
+        console.warn('Impossible de charger les dates du voyage:', e);
+      }
+    };
+    if (tripId) void loadTripDates();
+  }, [tripId]);
+
+  const getTripDays = () => {
+    const start = tripDates?.start_date ? new Date(`${tripDates.start_date}T00:00:00Z`) : null;
+    const end = tripDates?.end_date ? new Date(`${tripDates.end_date}T00:00:00Z`) : null;
+    if (!start || !end || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return [];
+    const days: string[] = [];
+    const msPerDay = 1000 * 60 * 60 * 24;
+    // Inclusif: du start_date au end_date
+    const diff = Math.round((end.getTime() - start.getTime()) / msPerDay);
+    const count = Math.max(0, diff) + 1;
+    for (let i = 0; i < count; i++) {
+      const d = new Date(start.getTime() + i * msPerDay);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  };
+
+  const formatDayLabel = (iso: string, idx: number) => {
+    try {
+      const d = new Date(`${iso}T00:00:00Z`);
+      const label = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }).format(d);
+      return `Jour ${idx + 1} • ${label}`;
+    } catch {
+      return `Jour ${idx + 1} • ${iso}`;
+    }
+  };
 
   const loadStages = async () => {
     setLoading(true);
@@ -76,6 +123,11 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
     }
     setLoading(false);
   };
+
+  const tripDays = getTripDays();
+  const hasDayView = tripType === 'roadtrip' && tripDays.length > 0;
+  const mapStages =
+    hasDayView && mapDayFilter !== 'all' ? stages.filter((s) => s.day_date === mapDayFilter) : stages;
 
   const handleDeleteStage = async (stageId: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette étape ?')) return;
@@ -146,7 +198,10 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
           {tripType === 'roadtrip' ? 'Étapes du road trip' : 'Destination'}
         </h2>
         <button
-          onClick={() => setShowAddStage(true)}
+          onClick={() => {
+            setAddStageDayDate(null);
+            setShowAddStage(true);
+          }}
           className="flex items-center space-x-2 px-4 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-medium hover:shadow-lg transform hover:-translate-y-1 tracking-wide"
         >
           <Plus className="w-5 h-5" />
@@ -173,30 +228,40 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
       ) : (
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 w-full">
           <div className="space-y-4 w-full min-w-0">
-            {stages.map((stage, index) => (
-              <div key={stage.id} className="bg-white rounded-lg shadow-sm p-4 sm:p-6 w-full overflow-hidden">
-                <div className="flex items-start justify-between mb-4 gap-2">
-                  <div className="flex items-start space-x-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 bg-gradient-to-br from-gold to-turquoise text-white rounded-full flex items-center justify-center font-bold flex-shrink-0 shadow-soft">
-                      {index + 1}
+            {(() => {
+              const days = getTripDays();
+              const hasDayView = tripType === 'roadtrip' && days.length > 0;
+              const sorted = [...stages].sort((a, b) => {
+                const ad = a.day_date || '';
+                const bd = b.day_date || '';
+                if (ad !== bd) return ad.localeCompare(bd);
+                return (a.order_index ?? 0) - (b.order_index ?? 0);
+              });
+
+              const renderStageCard = (stage: Stage, displayIndex: number) => (
+                <div key={stage.id} className="bg-white rounded-lg shadow-sm p-4 sm:p-6 w-full overflow-hidden">
+                  <div className="flex items-start justify-between mb-4 gap-2">
+                    <div className="flex items-start space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-gradient-to-br from-gold to-turquoise text-white rounded-full flex items-center justify-center font-bold flex-shrink-0 shadow-soft">
+                        {displayIndex}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg font-semibold text-dark-gray break-words">
+                          {stage.name}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-dark-gray/60 break-all">
+                          {stage.latitude.toFixed(4)}, {stage.longitude.toFixed(4)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base sm:text-lg font-semibold text-dark-gray break-words">
-                        {stage.name}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-dark-gray/60 break-all">
-                        {stage.latitude.toFixed(4)}, {stage.longitude.toFixed(4)}
-                      </p>
-                    </div>
+                    <button
+                      onClick={() => handleDeleteStage(stage.id)}
+                      className="text-burnt-orange hover:text-burnt-orange/80 p-2 transition-colors rounded-button hover:bg-cream flex-shrink-0"
+                      title="Supprimer cette étape"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDeleteStage(stage.id)}
-                    className="text-burnt-orange hover:text-burnt-orange/80 p-2 transition-colors rounded-button hover:bg-cream flex-shrink-0"
-                    title="Supprimer cette étape"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
 
                 {/* Récapitulatif des activités pour les voyages "single" */}
                 {tripType === 'single' && stage.points_of_interest && stage.points_of_interest.length > 0 && (
@@ -279,14 +344,117 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
                   </div>
                 )}
               </div>
-            ))}
+              );
+
+              if (!hasDayView) {
+                return sorted.map((stage, i) => renderStageCard(stage, i + 1));
+              }
+
+              // Jour par jour (roadtrip)
+              const withoutDate = sorted.filter((s) => !s.day_date);
+              return (
+                <div className="space-y-6">
+                  {days.map((dayIso, dayIdx) => {
+                    const items = sorted.filter((s) => s.day_date === dayIso);
+                    return (
+                      <div key={dayIso} className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="text-base sm:text-lg font-semibold text-dark-gray">
+                            {formatDayLabel(dayIso, dayIdx)}
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddStageDayDate(dayIso);
+                              setShowAddStage(true);
+                            }}
+                            className="flex items-center space-x-2 px-3 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-soft"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Ajouter</span>
+                          </button>
+                        </div>
+                        {items.length === 0 ? (
+                          <div className="bg-cream rounded-lg p-4 text-sm text-dark-gray/70 font-body">
+                            Aucune étape pour ce jour.
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {items.map((stage, idx) => renderStageCard(stage, idx + 1))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {withoutDate.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-base sm:text-lg font-semibold text-dark-gray">Sans date</h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddStageDayDate(null);
+                            setShowAddStage(true);
+                          }}
+                          className="flex items-center space-x-2 px-3 py-2 bg-gold text-white font-body font-bold rounded-button hover:bg-gold/90 transition-all shadow-soft"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Ajouter</span>
+                        </button>
+                      </div>
+                      <div className="space-y-4">
+                        {withoutDate.map((stage, idx) => renderStageCard(stage, idx + 1))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 h-fit lg:sticky lg:top-6 w-full overflow-hidden">
             <h3 className="text-base sm:text-lg font-semibold text-dark-gray mb-4 break-words">Carte</h3>
             {stages.length > 0 ? (
               <div className="w-full overflow-hidden">
-                <StagesMapGoogle stages={stages} onAddPoiToStage={handleAddPoiToStageFromMap} />
+                {hasDayView && (
+                  <div className="mb-3 -mx-1">
+                    <div className="flex items-center gap-2 overflow-x-auto px-1 pb-1" style={{ WebkitOverflowScrolling: 'touch' as any }}>
+                      <button
+                        type="button"
+                        onClick={() => setMapDayFilter('all')}
+                        className={`shrink-0 px-3 py-2 rounded-button text-sm font-body font-semibold border transition-colors ${
+                          mapDayFilter === 'all'
+                            ? 'bg-dark-gray text-white border-dark-gray'
+                            : 'bg-white text-dark-gray border-cream hover:bg-cream'
+                        }`}
+                      >
+                        Tous
+                      </button>
+                      {tripDays.map((d, idx) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setMapDayFilter(d)}
+                          className={`shrink-0 px-3 py-2 rounded-button text-sm font-body font-semibold border transition-colors ${
+                            mapDayFilter === d
+                              ? 'bg-turquoise text-white border-turquoise'
+                              : 'bg-white text-dark-gray border-cream hover:bg-cream'
+                          }`}
+                          title={formatDayLabel(d, idx)}
+                        >
+                          Jour {idx + 1}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <StagesMapGoogle
+                  stages={mapStages}
+                  dayOrder={tripDays}
+                  onAddPoiToStage={handleAddPoiToStageFromMap}
+                />
               </div>
             ) : (
               <div className="bg-cream rounded-button h-64 sm:h-96 flex items-center justify-center w-full">
@@ -306,9 +474,13 @@ export function StagesTab({ tripId, tripType }: StagesTabProps) {
           tripType={tripType}
           orderIndex={stages.length}
           existingStage={tripType === 'single' && stages.length > 0 ? stages[0] : null}
+          tripStartDate={tripDates?.start_date || null}
+          tripEndDate={tripDates?.end_date || null}
+          defaultDayDate={addStageDayDate}
           onClose={() => setShowAddStage(false)}
           onSuccess={() => {
             setShowAddStage(false);
+            setAddStageDayDate(null);
             loadStages();
           }}
         />
@@ -322,12 +494,26 @@ interface AddStageModalProps {
   tripType: 'single' | 'roadtrip';
   orderIndex: number;
   existingStage?: Stage | null;
+  tripStartDate?: string | null;
+  tripEndDate?: string | null;
+  defaultDayDate?: string | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, onSuccess }: AddStageModalProps) {
+function AddStageModal({
+  tripId,
+  tripType,
+  orderIndex,
+  existingStage,
+  tripStartDate,
+  tripEndDate,
+  defaultDayDate,
+  onClose,
+  onSuccess
+}: AddStageModalProps) {
   const [name, setName] = useState(existingStage?.name || '');
+  const [dayDate, setDayDate] = useState<string>(defaultDayDate || existingStage?.day_date || '');
   const [selectedDestination, setSelectedDestination] = useState<{ name: string; lat: number; lon: number } | null>(
     existingStage ? {
       name: existingStage.name,
@@ -406,6 +592,7 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
           p_name: name.trim(),
           p_latitude: selectedDestination?.lat || existingStage.latitude,
           p_longitude: selectedDestination?.lon || existingStage.longitude,
+          p_day_date: dayDate ? dayDate : null,
           p_accommodation_link: accommodationLink || null,
           p_transport_to_next: transportToNext || null,
           p_notes: notes || null,
@@ -434,6 +621,7 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
           p_order_index: orderIndex,
           p_latitude: selectedDestination.lat,
           p_longitude: selectedDestination.lon,
+          p_day_date: dayDate ? dayDate : null,
           p_accommodation_link: accommodationLink || null,
           p_transport_to_next: transportToNext || null,
           p_notes: notes || null,
@@ -499,6 +687,26 @@ function AddStageModal({ tripId, tripType, orderIndex, existingStage, onClose, o
                   Coordonnées: {selectedDestination.lat.toFixed(4)}, {selectedDestination.lon.toFixed(4)}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Jour (roadtrip): organisation jour par jour */}
+          {tripType === 'roadtrip' && tripStartDate && tripEndDate && (
+            <div>
+              <label className="block text-sm font-medium text-dark-gray/80 mb-2">
+                Jour (optionnel)
+              </label>
+              <input
+                type="date"
+                value={dayDate}
+                onChange={(e) => setDayDate(e.target.value)}
+                min={tripStartDate || undefined}
+                max={tripEndDate || undefined}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="mt-2 text-xs text-dark-gray/60 font-body">
+                Astuce: ajoute tes étapes directement dans chaque jour (bouton “Ajouter” dans le planning).
+              </p>
             </div>
           )}
 

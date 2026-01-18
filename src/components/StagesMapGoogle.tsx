@@ -16,10 +16,12 @@ interface Stage {
   longitude: number;
   notes?: string | null;
   points_of_interest?: PointOfInterest[] | null;
+  day_date?: string | null;
 }
 
 interface StagesMapGoogleProps {
   stages: Stage[];
+  dayOrder?: string[];
   onAddPoiToStage?: (poi: PointOfInterest, stageId: string) => void | Promise<void>;
 }
 
@@ -32,7 +34,7 @@ import { GOOGLE_MAPS_LIBRARIES } from '../lib/googleMapsConfig';
 
 const libraries = GOOGLE_MAPS_LIBRARIES;
 
-export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
+export function StagesMapGoogle({ stages, dayOrder }: StagesMapGoogleProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -65,6 +67,14 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
       !isNaN(stage.longitude)
     );
   }, [stages]);
+
+  const dayIndexByDate = useMemo(() => {
+    const map = new Map<string, number>();
+    (dayOrder || []).forEach((d, idx) => map.set(d, idx));
+    return map;
+  }, [dayOrder]);
+
+  const dayPalette = ['#FFC857', '#00B4D8', '#2D6A4F', '#E76F51', '#6C63FF', '#2A9D8F'];
 
   useEffect(() => {
     setIsMounted(true);
@@ -364,17 +374,17 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
         }}
       >
         {validStages.map((stage, index) => {
-          // Créer une icône personnalisée avec un dégradé doré/turquoise
+          const dayIdx = stage.day_date ? dayIndexByDate.get(stage.day_date) : undefined;
+          const fill = typeof dayIdx === 'number' ? dayPalette[dayIdx % dayPalette.length] : '#9CA3AF';
+          const dayLabel = typeof dayIdx === 'number' ? `J${dayIdx + 1}` : '';
+
+          // Icône stage: couleur par jour + badge "Jx"
           const iconUrl = `data:image/svg+xml;base64,${btoa(`
-            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="grad${index}" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#FFC857;stop-opacity:1" />
-                  <stop offset="100%" style="stop-color:#00B4D8;stop-opacity:1" />
-                </linearGradient>
-              </defs>
-              <circle cx="16" cy="16" r="14" fill="url(#grad${index})" stroke="white" stroke-width="3"/>
-              <text x="16" y="20" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">${index + 1}</text>
+            <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="18" cy="18" r="15" fill="${fill}" stroke="white" stroke-width="3"/>
+              <text x="18" y="22" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">${index + 1}</text>
+              ${dayLabel ? `<rect x="4" y="4" rx="6" ry="6" width="18" height="12" fill="rgba(0,0,0,0.35)"></rect>` : ''}
+              ${dayLabel ? `<text x="13" y="13" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="white" text-anchor="middle">${dayLabel}</text>` : ''}
             </svg>
           `)}`;
 
@@ -384,8 +394,8 @@ export function StagesMapGoogle({ stages }: StagesMapGoogleProps) {
               position={{ lat: stage.latitude, lng: stage.longitude }}
               icon={{
                 url: iconUrl,
-                scaledSize: new google.maps.Size(32, 32),
-                anchor: new google.maps.Point(16, 16)
+                scaledSize: new google.maps.Size(36, 36),
+                anchor: new google.maps.Point(18, 18)
               }}
               onClick={() => setSelectedStage(stage)}
             >
