@@ -2,6 +2,11 @@
   "buildCommand": "yarn build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@5.5.21"
+    }
+  },
   "headers": [
     {
       "source": "/assets/(.*)",
