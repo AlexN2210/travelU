@@ -77,6 +77,44 @@ function computeRefererForUpstream(url: string): { referer?: string; origin?: st
   return {};
 }
 
+function normalizeUpstreamImageUrl(originalUrl: string): { url: string } {
+  // Certains liens Google (PhotoService.GetPhoto) sont prévus pour être consommés par la lib JS.
+  // En server-side, on a souvent 403. On convertit vers l'endpoint officiel "place/photo"
+  // en extrayant le photo_reference depuis le paramètre protobuf "1s<ref>".
+  try {
+    const u = new URL(originalUrl);
+    if (u.hostname === 'maps.googleapis.com' && u.pathname.includes('/maps/api/place/js/PhotoService.GetPhoto')) {
+      const rawQuery = u.search || '';
+      const parts = rawQuery.replace(/^\?/, '').split('&').filter(Boolean);
+      const first = parts[0] || '';
+      let photoRef = '';
+      if (first.startsWith('1s')) photoRef = first.slice(2);
+
+      // maxwidth: on essaie de lire "3uXXXX" sinon 1000
+      let maxwidth = 1000;
+      for (const p of parts) {
+        const m = p.match(/^3u(\d{2,5})$/);
+        if (m) {
+          maxwidth = Number(m[1]);
+          break;
+        }
+      }
+
+      const key = u.searchParams.get('key') || '';
+      if (photoRef && key) {
+        const nu = new URL('https://maps.googleapis.com/maps/api/place/photo');
+        nu.searchParams.set('maxwidth', String(maxwidth));
+        nu.searchParams.set('photo_reference', photoRef);
+        nu.searchParams.set('key', key);
+        return { url: nu.toString() };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { url: originalUrl };
+}
+
 // Vercel/TS peut être très strict sur les génériques de SupabaseClient.
 // Ici on accepte un client “admin” typé large, car on fait surtout storage + from().
 async function cacheExternalImage(admin: SupabaseClient<any, any, any, any>, url: string) {
@@ -86,8 +124,9 @@ async function cacheExternalImage(admin: SupabaseClient<any, any, any, any>, url
   if (ipType && isPrivateIp(u.hostname)) return { error: 'IP bloquée' as const };
 
   const ref = computeRefererForUpstream(url);
+  const normalized = normalizeUpstreamImageUrl(url);
 
-  const upstream = await fetch(url, {
+  const upstream = await fetch(normalized.url, {
     method: 'GET',
     headers: {
       accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
