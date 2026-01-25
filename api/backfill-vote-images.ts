@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { isIP } from 'node:net';
 
 function isPrivateIp(ip: string) {
@@ -53,7 +53,9 @@ function isAlreadyStable(u: string) {
   return u.includes('/storage/v1/object/public/vote-option-photos/');
 }
 
-async function cacheExternalImage(admin: ReturnType<typeof createClient>, url: string) {
+// Vercel/TS peut être très strict sur les génériques de SupabaseClient.
+// Ici on accepte un client “admin” typé large, car on fait surtout storage + from().
+async function cacheExternalImage(admin: SupabaseClient<any, any, any, any>, url: string) {
   const u = new URL(url);
   if (isBlockedHost(u.hostname)) return { error: 'Host bloqué' as const };
   const ipType = isIP(u.hostname);
