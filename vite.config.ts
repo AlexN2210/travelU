@@ -14,7 +14,10 @@ export default defineConfig({
       workbox: {
         cleanupOutdatedCaches: true,
         clientsClaim: true,
-        skipWaiting: true
+        skipWaiting: true,
+        // IMPORTANT: ne pas servir l'app shell (index.html) sur les routes API,
+        // sinon en naviguant vers /api/... on retombe sur le dashboard au lieu d'obtenir du JSON.
+        navigateFallbackDenylist: [/^\/api\//]
       },
       manifest: {
         name: 'TravelU',
