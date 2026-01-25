@@ -53,6 +53,30 @@ function isAlreadyStable(u: string) {
   return u.includes('/storage/v1/object/public/vote-option-photos/');
 }
 
+function computeRefererForUpstream(url: string): { referer?: string; origin?: string } {
+  try {
+    const u = new URL(url);
+
+    // Cas Google Places JS PhotoService: la clé est souvent restreinte par HTTP referrer.
+    // L'URL contient généralement r_url=<URL de notre app>; on l'utilise comme Referer/Origin.
+    if (u.hostname === 'maps.googleapis.com' && u.pathname.includes('/maps/api/place/js/PhotoService.GetPhoto')) {
+      const rUrl = u.searchParams.get('r_url');
+      if (rUrl) {
+        try {
+          const decoded = decodeURIComponent(rUrl);
+          const appUrl = new URL(decoded);
+          return { referer: appUrl.origin + '/', origin: appUrl.origin };
+        } catch {
+          // ignore
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
 // Vercel/TS peut être très strict sur les génériques de SupabaseClient.
 // Ici on accepte un client “admin” typé large, car on fait surtout storage + from().
 async function cacheExternalImage(admin: SupabaseClient<any, any, any, any>, url: string) {
@@ -61,6 +85,8 @@ async function cacheExternalImage(admin: SupabaseClient<any, any, any, any>, url
   const ipType = isIP(u.hostname);
   if (ipType && isPrivateIp(u.hostname)) return { error: 'IP bloquée' as const };
 
+  const ref = computeRefererForUpstream(url);
+
   const upstream = await fetch(url, {
     method: 'GET',
     headers: {
@@ -68,7 +94,8 @@ async function cacheExternalImage(admin: SupabaseClient<any, any, any, any>, url
       'user-agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
       'accept-language': 'fr-FR,fr;q=0.9,en;q=0.8',
-      referer: u.origin
+      ...(ref.referer ? { referer: ref.referer } : { referer: u.origin }),
+      ...(ref.origin ? { origin: ref.origin } : {})
     },
     redirect: 'follow'
   });
