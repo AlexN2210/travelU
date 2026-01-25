@@ -33,28 +33,96 @@ interface VotingTabProps {
   tripId: string;
 }
 
-function VoteOptionImage({ src, alt }: { src: string; alt: string }) {
-  const [failed, setFailed] = useState(false);
+function toImageProxyUrl(src: string) {
+  return `/api/image-proxy?url=${encodeURIComponent(src)}`;
+}
 
+function canProxyImageUrl(src: string) {
+  return /^https?:\/\//i.test(src);
+}
+
+function SmartImage({
+  src,
+  alt,
+  className,
+  fallback,
+  onFinalError,
+  onRecovered
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  fallback?: React.ReactNode;
+  onFinalError?: () => void;
+  onRecovered?: (cachedUrl: string) => void;
+}) {
+  const [attempt, setAttempt] = useState<0 | 1 | 2>(0);
+  const recoveredRef = useRef(false);
+
+  useEffect(() => {
+    setAttempt(0);
+    recoveredRef.current = false;
+  }, [src]);
+
+  if (!src) return null;
+
+  const resolvedSrc =
+    attempt === 0 ? src : attempt === 1 && canProxyImageUrl(src) ? toImageProxyUrl(src) : '';
+
+  if (attempt === 2 || !resolvedSrc) {
+    return <>{fallback || null}</>;
+  }
+
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onLoad={() => {
+        // Si on a dû passer par le proxy, essayer de “cacher” l’image en Storage (URL stable)
+        if (attempt === 1 && !recoveredRef.current && onRecovered && canProxyImageUrl(src)) {
+          recoveredRef.current = true;
+          fetch(`/api/cache-image?url=${encodeURIComponent(src)}`)
+            .then((r) => r.json())
+            .then((j) => {
+              const u = j?.publicUrl;
+              if (typeof u === 'string' && u.length > 0) onRecovered(u);
+            })
+            .catch(() => {
+              // ignore
+            });
+        }
+      }}
+      onError={() => {
+        if (attempt === 0 && canProxyImageUrl(src)) {
+          setAttempt(1);
+          return;
+        }
+        setAttempt(2);
+        onFinalError?.();
+      }}
+    />
+  );
+}
+
+function VoteOptionImage({ src, alt }: { src: string; alt: string }) {
   if (!src) return null;
 
   return (
     <div className="mb-4">
-      {!failed ? (
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-64 object-cover rounded-xl border border-cream"
-          loading="lazy"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <div className="w-full h-64 rounded-xl border border-cream bg-cream flex items-center justify-center px-4 text-center">
-          <p className="text-sm text-dark-gray/70 font-body break-words">
-            Impossible de charger l’image. Utilise une URL directe d’image (ex: `.jpg`, `.png`) ou une image hébergée publiquement.
-          </p>
-        </div>
-      )}
+      <SmartImage
+        src={src}
+        alt={alt}
+        className="w-full h-64 object-cover rounded-xl border border-cream"
+        fallback={
+          <div className="w-full h-64 rounded-xl border border-cream bg-cream flex items-center justify-center px-4 text-center">
+            <p className="text-sm text-dark-gray/70 font-body break-words">
+              Impossible de charger l’image du lien. Ajoute des captures d’écran via “Photos” pour un affichage fiable.
+            </p>
+          </div>
+        }
+      />
     </div>
   );
 }
@@ -101,6 +169,23 @@ export function VotingTab({ tripId }: VotingTabProps) {
   const [tripParticipantsCount, setTripParticipantsCount] = useState<number>(1);
   const [swipePhotoIndex, setSwipePhotoIndex] = useState(0);
   const [swipePhotoFailed, setSwipePhotoFailed] = useState(false);
+
+  const repairOptionPrimaryImage = useCallback(
+    async (optionId: string, cachedUrl: string) => {
+      // 1) Update UI optimiste
+      setOptions((arr) => arr.map((o) => (o.id === optionId ? { ...o, image_url: cachedUrl } : o)));
+      // 2) Persister côté DB (si autorisé)
+      try {
+        await supabase.rpc('update_vote_option', {
+          p_option_id: optionId,
+          p_image_url: cachedUrl
+        });
+      } catch {
+        // ignore
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -771,12 +856,17 @@ export function VotingTab({ tripId }: VotingTabProps) {
                       className="relative w-full aspect-[4/3] bg-cream"
                     >
                       {!swipePhotoFailed ? (
-                        <img
+                        <SmartImage
                           src={current}
                           alt={currentSwipeOption.title}
                           className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                          onError={() => setSwipePhotoFailed(true)}
+                          onFinalError={() => setSwipePhotoFailed(true)}
+                          onRecovered={(cachedUrl) => {
+                            // On ne “répare” que si l’utilisateur a le droit d’éditer (auteur / editor)
+                            if (canEditOption(currentSwipeOption)) {
+                              repairOptionPrimaryImage(currentSwipeOption.id, cachedUrl);
+                            }
+                          }}
                         />
                       ) : (
                         <div className="absolute inset-0 w-full h-full flex items-center justify-center px-4 text-center">
@@ -1010,7 +1100,12 @@ export function VotingTab({ tripId }: VotingTabProps) {
                             aria-label={`Voir photo ${idx + 1}`}
                             title="Ouvrir la galerie"
                           >
-                            <img src={u} alt={`Photo ${idx + 1}`} className="w-16 h-16 object-cover rounded-lg border border-cream" />
+                            <SmartImage
+                              src={u}
+                              alt={`Photo ${idx + 1}`}
+                              className="w-16 h-16 object-cover rounded-lg border border-cream"
+                              fallback={<div className="w-16 h-16 rounded-lg border border-cream bg-cream" />}
+                            />
                           </button>
                         ))}
                       </div>
@@ -1104,7 +1199,12 @@ export function VotingTab({ tripId }: VotingTabProps) {
                           aria-label={`Voir photo ${idx + 1}`}
                           title="Ouvrir la galerie"
                         >
-                          <img src={u} alt={`Photo ${idx + 1}`} className="w-16 h-16 object-cover rounded-lg border border-cream" />
+                          <SmartImage
+                            src={u}
+                            alt={`Photo ${idx + 1}`}
+                            className="w-16 h-16 object-cover rounded-lg border border-cream"
+                            fallback={<div className="w-16 h-16 rounded-lg border border-cream bg-cream" />}
+                          />
                         </button>
                       ))}
                     </div>
@@ -1269,7 +1369,16 @@ function PhotoGalleryModal({
 
         <div className="relative bg-black">
           {current ? (
-            <img src={current} alt={title} className="w-full h-[60vh] object-contain" />
+            <SmartImage
+              src={current}
+              alt={title}
+              className="w-full h-[60vh] object-contain"
+              fallback={
+                <div className="w-full h-[40vh] flex items-center justify-center bg-black text-white/70">
+                  Impossible de charger l’image
+                </div>
+              }
+            />
           ) : (
             <div className="w-full h-[40vh] flex items-center justify-center bg-black text-white/70">
               Aucune image
@@ -1309,7 +1418,12 @@ function PhotoGalleryModal({
                   onClick={() => onChange(idx)}
                   aria-label={`Voir photo ${idx + 1}`}
                 >
-                  <img src={u} alt={`Miniature ${idx + 1}`} className="w-16 h-16 object-cover" />
+                  <SmartImage
+                    src={u}
+                    alt={`Miniature ${idx + 1}`}
+                    className="w-16 h-16 object-cover"
+                    fallback={<div className="w-16 h-16 bg-black/20" />}
+                  />
                 </button>
               ))}
             </div>
@@ -1471,6 +1585,13 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
         if (!imageUrl && data.image) {
           setImagePreviewError(false);
           setImageUrl(data.image);
+          // Tenter de copier l’image distante en Storage (URL stable) pour éviter les liens expirés
+          try {
+            const cached = await fetch(`/api/cache-image?url=${encodeURIComponent(data.image)}`).then((r) => r.json());
+            if (cached?.publicUrl) setImageUrl(cached.publicUrl);
+          } catch {
+            // ignore
+          }
         }
         // Activités: tenter d'extraire un tarif / pers depuis le texte si disponible
         if (categoryName === 'activity' && !price) {
@@ -1757,12 +1878,11 @@ function AddOptionModal({ tripId, categoryId, categoryName, categoryTitle, latit
             {imageUrl && (
               <div className="mt-3">
                 {!imagePreviewError ? (
-                  <img
+                  <SmartImage
                     src={imageUrl}
                     alt="Aperçu"
                     className="w-full h-40 object-cover rounded-xl border border-gray-200"
-                    loading="lazy"
-                    onError={() => setImagePreviewError(true)}
+                    onFinalError={() => setImagePreviewError(true)}
                   />
                 ) : (
                   <div className="w-full h-40 rounded-xl border border-gray-200 bg-cream flex items-center justify-center px-4 text-center">
@@ -2129,7 +2249,12 @@ function EditOptionModal({ tripId, option, onClose, onSuccess }: EditOptionModal
                 <div className="grid grid-cols-3 gap-2">
                   {existingPhotoUrls.map((u, idx) => (
                     <div key={`${u}-${idx}`} className="relative">
-                      <img src={u} alt={`Photo ${idx + 1}`} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                      <SmartImage
+                        src={u}
+                        alt={`Photo ${idx + 1}`}
+                        className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                        fallback={<div className="w-full h-20 rounded-lg border border-gray-200 bg-cream" />}
+                      />
                       <button
                         type="button"
                         onClick={() => setExistingPhotoUrls((arr) => arr.filter((_, i) => i !== idx))}
@@ -2168,7 +2293,12 @@ function EditOptionModal({ tripId, option, onClose, onSuccess }: EditOptionModal
               {photoPreviews.length > 0 && (
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {photoPreviews.map((u, idx) => (
-                    <img key={`${u}-${idx}`} src={u} alt={`Nouveau ${idx + 1}`} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                    <SmartImage
+                      src={u}
+                      alt={`Nouveau ${idx + 1}`}
+                      className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                      fallback={<div className="w-full h-20 rounded-lg border border-gray-200 bg-cream" />}
+                    />
                   ))}
                 </div>
               )}
